@@ -1,1 +1,4 @@
 .vscode/settings.json
+test/stattest
+test/stattest.dSYM/Contents/Info.plist
+test/stattest.dSYM/Contents/Resources/DWARF/stattest

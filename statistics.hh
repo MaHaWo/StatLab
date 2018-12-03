@@ -27,19 +27,26 @@
 #include <vector>
 
 using namespace Statistics::Utils;
-namespace Statistics {
-template <typename T> struct SumNaive {
-  private:
+namespace Statistics
+{
+template <typename T>
+struct SumNaive
+{
+private:
     T _s;
 
-  public:
+public:
     using value_type = T;
     /**
      * @brief Construct a new Sum object
      *
      */
-    SumNaive() : _s(T()) {}
-    SumNaive(T&& v) : _s(v) {}
+    SumNaive() : _s(T())
+    {
+    }
+    SumNaive(T&& v) : _s(v)
+    {
+    }
     SumNaive(const SumNaive& other) = default;
     SumNaive(SumNaive&& other) = default;
     SumNaive& operator=(const SumNaive& other) = default;
@@ -50,14 +57,20 @@ template <typename T> struct SumNaive {
      * @brief Reset the internal state
      *
      */
-    void reset() { _s = T(); }
+    void reset()
+    {
+        _s = T();
+    }
 
     /**
      * @brief get result of computation
      *
      * @return T
      */
-    T result() { return _s; }
+    T result()
+    {
+        return _s;
+    }
 
     /**
      * @brief
@@ -73,11 +86,11 @@ template <typename T> struct SumNaive {
      */
 
     template <typename InputIterator, typename Getter>
-    inline T operator()(InputIterator&& begin, InputIterator&& end,
-                        Getter&& getter) {
-        _s += std::accumulate(
-            begin, end, value_type(),
-            [&](auto&& lhs, auto&& rhs) { return lhs + getter(rhs); });
+    inline T operator()(InputIterator&& begin, InputIterator&& end, Getter&& getter)
+    {
+        _s += std::accumulate(begin, end, value_type(), [&](auto&& lhs, auto&& rhs) {
+            return lhs + getter(rhs);
+        });
         return _s;
     }
 
@@ -90,7 +103,8 @@ template <typename T> struct SumNaive {
      * @return T
      */
     template <typename InputIterator>
-    inline T operator()(InputIterator&& begin, InputIterator&& end) {
+    inline T operator()(InputIterator&& begin, InputIterator&& end)
+    {
         this->operator()(std::forward<InputIterator>(begin),
                          std::forward<InputIterator>(end),
                          [](auto&& value) { return value; });
@@ -103,7 +117,8 @@ template <typename T> struct SumNaive {
      * @param value
      * @return T
      */
-    T operator()(T&& value) {
+    T operator()(T&& value)
+    {
         _s += value;
         return _s;
     }
@@ -113,18 +128,24 @@ template <typename T> struct SumNaive {
  *
  * @tparam T return type
  */
-template <typename T> struct SumPairwise {
-  private:
+template <typename T>
+struct SumPairwise
+{
+private:
     T _s;
 
-  public:
+public:
     using value_type = T;
     /**
      * @brief Construct a new Sum object
      *
      */
-    SumPairwise() : _s(T()) {}
-    SumPairwise(T&& v) : _s(v) {}
+    SumPairwise() : _s(T())
+    {
+    }
+    SumPairwise(T&& v) : _s(v)
+    {
+    }
 
     SumPairwise(const SumPairwise& other) = default;
     SumPairwise(SumPairwise&& other) = default;
@@ -136,14 +157,20 @@ template <typename T> struct SumPairwise {
      * @brief Reset the internal state
      *
      */
-    void reset() { _s = T(); }
+    void reset()
+    {
+        _s = T();
+    }
 
     /**
      * @brief get result of computation
      *
      * @return T
      */
-    T result() { return _s; }
+    T result()
+    {
+        return _s;
+    }
 
     /**
      * @brief
@@ -160,28 +187,29 @@ template <typename T> struct SumPairwise {
      */
 
     template <typename InputIterator, typename Getter>
-    inline value_type operator()(InputIterator&& begin, InputIterator&& end,
-                                 Getter&& getter) {
-        if (begin != end) {
-            if (std::distance(begin, end) <= 1000) {
+    inline value_type operator()(InputIterator&& begin, InputIterator&& end, Getter&& getter)
+    {
+        if (begin != end)
+        {
+            if (std::distance(begin, end) <= 1000)
+            {
                 value_type s = std::accumulate(
                     begin, end, value_type(),
                     [&](auto&& lhs, auto&& rhs) { return lhs + getter(rhs); });
 
                 _s += s;
-            } else {
-                std::size_t t =
-                    std::floor(double(std::distance(begin, end) / 2));
+            }
+            else
+            {
+                std::size_t t = std::floor(double(std::distance(begin, end) / 2));
 
-                this->operator()(
-                    std::forward<InputIterator>(begin),
-                    std::next(std::forward<InputIterator>(begin), t),
-                    std::forward<Getter>(getter));
+                this->operator()(std::forward<InputIterator>(begin),
+                                 std::next(std::forward<InputIterator>(begin), t),
+                                 std::forward<Getter>(getter));
 
-                this->operator()(
-                    std::next(std::forward<InputIterator>(begin), t),
-                    std::forward<InputIterator>(end),
-                    std::forward<Getter>(getter));
+                this->operator()(std::next(std::forward<InputIterator>(begin), t),
+                                 std::forward<InputIterator>(end),
+                                 std::forward<Getter>(getter));
             }
         }
         return _s;
@@ -196,8 +224,10 @@ template <typename T> struct SumPairwise {
      * @return value_type
      */
     template <typename InputIterator>
-    inline value_type operator()(InputIterator&& begin, InputIterator&& end) {
-        if (begin != end) {
+    inline value_type operator()(InputIterator&& begin, InputIterator&& end)
+    {
+        if (begin != end)
+        {
             this->operator()(std::forward<InputIterator>(begin),
                              std::forward<InputIterator>(end),
                              [](auto& value) { return value; });
@@ -211,7 +241,8 @@ template <typename T> struct SumPairwise {
      * @param value
      * @return T
      */
-    inline T operator()(T&& value) {
+    inline T operator()(T&& value)
+    {
         _s += value;
         return _s;
     }
@@ -222,27 +253,33 @@ template <typename T> struct SumPairwise {
  *
  * @tparam T
  */
-template <typename T> struct SumKahan {
-  private:
+template <typename T>
+struct SumKahan
+{
+private:
     T _y;
     T _t;
     T _s;
     T _comp;
 
-  public:
+public:
     using value_type = T;
     /**
      * @brief Construct a new Sum Kahan object
      *
      */
-    SumKahan() : _y(T()), _t(T()), _s(T()), _comp(T()) {}
+    SumKahan() : _y(T()), _t(T()), _s(T()), _comp(T())
+    {
+    }
 
     /**
      * @brief Construct a new Sum Kahan object
      *
      * @param v initializer
      */
-    SumKahan(T&& v) : _y(v), _t(v), _s(v), _comp(v) {}
+    SumKahan(T&& v) : _y(v), _t(v), _s(v), _comp(v)
+    {
+    }
 
     /**
      * @brief Construct a new Sum Kahan object
@@ -283,7 +320,8 @@ template <typename T> struct SumKahan {
      * @brief reset internal state
      *
      */
-    void reset() {
+    void reset()
+    {
         _s = T();
         _y = T();
         _t = T();
@@ -295,7 +333,10 @@ template <typename T> struct SumKahan {
      *
      * @return double
      */
-    T result() { return _s; }
+    T result()
+    {
+        return _s;
+    }
     /**
      * @brief      Summation of the range [begin, end) using Kahan's
      * algorithm.
@@ -311,11 +352,13 @@ template <typename T> struct SumKahan {
      */
 
     template <typename InputIterator, typename Getter>
-    inline T operator()(InputIterator&& begin, InputIterator&& end,
-                        Getter&& getter) {
-        if (begin != end) {
+    inline T operator()(InputIterator&& begin, InputIterator&& end, Getter&& getter)
+    {
+        if (begin != end)
+        {
             _comp = 0.;
-            for (; begin != end; ++begin) {
+            for (; begin != end; ++begin)
+            {
                 _y = getter(*begin) - _comp;
                 _t = _s + _y;
                 _comp = (_t - _s) - _y;
@@ -334,7 +377,8 @@ template <typename T> struct SumKahan {
      * @return T
      */
     template <typename InputIterator>
-    inline T operator()(InputIterator&& begin, InputIterator&& end) {
+    inline T operator()(InputIterator&& begin, InputIterator&& end)
+    {
         return this->operator()(std::forward<InputIterator>(begin),
                                 std::forward<InputIterator>(end),
                                 [](auto&& value) { return value; });
@@ -347,7 +391,8 @@ template <typename T> struct SumKahan {
      * @param value
      * @return double
      */
-    inline T operator()(T&& value) {
+    inline T operator()(T&& value)
+    {
         _y = value - _comp;
         _t = _s + _y;
         _s = _t;
@@ -362,17 +407,19 @@ template <typename T> struct SumKahan {
  * @tparam Summation Summation algorithm, defaults to 'Sum', but can also be
  * 'SumKahan'
  */
-template <typename T, int order,
-          template <typename> class Summation = SumPairwise>
-struct Moment {
-  private:
+template <typename T, int order, template <typename> class Summation = SumPairwise>
+struct Moment
+{
+private:
     T _mmnt;
     T _n;
     Summation<T> _sum;
 
-  public:
+public:
     using value_type = T;
-    Moment() : _mmnt(T()), _n(T()), _sum(Summation<T>()) {}
+    Moment() : _mmnt(T()), _n(T()), _sum(Summation<T>())
+    {
+    }
     virtual ~Moment() = default;
     Moment(const Moment& other) = default;
     Moment(Moment&& other) = default;
@@ -384,13 +431,17 @@ struct Moment {
      *
      * @return double
      */
-    double result() { return _mmnt / _n; }
+    double result()
+    {
+        return _mmnt / _n;
+    }
 
     /**
      * @brief reset all internal members including result
      *
      */
-    void reset() {
+    void reset()
+    {
         _mmnt = 0;
         _n = 0;
         _sum.reset();
@@ -409,9 +460,10 @@ struct Moment {
      * @return    order-th moment wrt zero.
      */
     template <typename InputIterator, typename Getter>
-    inline T operator()(InputIterator&& begin, InputIterator&& end,
-                        Getter&& getter) {
-        if (begin != end) {
+    inline T operator()(InputIterator&& begin, InputIterator&& end, Getter&& getter)
+    {
+        if (begin != end)
+        {
             _n += std::distance(begin, end);
             _mmnt += _sum(std::forward<InputIterator>(begin),
                           std::forward<InputIterator>(end),
@@ -434,7 +486,8 @@ struct Moment {
      * @return    order-th moment wrt zero.
      */
     template <typename InputIterator>
-    inline T operator()(InputIterator&& begin, InputIterator&& end) {
+    inline T operator()(InputIterator&& begin, InputIterator&& end)
+    {
         return this->operator()(std::forward<InputIterator>(begin),
                                 std::forward<InputIterator>(end),
                                 [](auto&& value) { return value; });
@@ -448,7 +501,8 @@ struct Moment {
      * @param value Value to update the moment with
      * @return double updated  order-th moment wrt zero.
      */
-    inline T operator()(T&& value) {
+    inline T operator()(T&& value)
+    {
         ++_n;
         _mmnt = _sum(std::pow(value, order));
         return _mmnt / _n;
@@ -460,7 +514,8 @@ struct Moment {
  *
  */
 template <typename T, template <typename> class Summation = SumPairwise>
-struct ArithmeticMean : Moment<T, 1, Summation> {
+struct ArithmeticMean : Moment<T, 1, Summation>
+{
     ArithmeticMean() = default;
     virtual ~ArithmeticMean() = default;
     ArithmeticMean(const ArithmeticMean& other) = default;
@@ -474,28 +529,35 @@ struct ArithmeticMean : Moment<T, 1, Summation> {
  *
  */
 template <typename T, template <typename> class Summation = SumPairwise>
-struct HarmonicMean {
-  private:
+struct HarmonicMean
+{
+private:
     T _hm;
     T _n;
     Summation<T> _sum;
 
-  public:
+public:
     using value_type = T;
-    HarmonicMean() : _hm(T()), _n(T()), _sum(Summation<T>()) {}
+    HarmonicMean() : _hm(T()), _n(T()), _sum(Summation<T>())
+    {
+    }
     virtual ~HarmonicMean() = default;
     HarmonicMean(const HarmonicMean& other) = default;
     HarmonicMean(HarmonicMean&& other) = default;
     HarmonicMean& operator=(const HarmonicMean& other) = default;
     HarmonicMean& operator=(HarmonicMean&& other) = default;
 
-    void reset() {
+    void reset()
+    {
         _hm = 0;
         _n = 0;
         _sum.reset();
     }
 
-    inline T result() { return _n / _hm; }
+    inline T result()
+    {
+        return _n / _hm;
+    }
     /**
      * @brief      Function computes the harmonic mean of the range [begin,
      * end).
@@ -510,9 +572,10 @@ struct HarmonicMean {
      */
 
     template <typename InputIterator, typename Getter>
-    inline T operator()(InputIterator&& begin, InputIterator&& end,
-                        Getter&& getter) {
-        if (begin != end) {
+    inline T operator()(InputIterator&& begin, InputIterator&& end, Getter&& getter)
+    {
+        if (begin != end)
+        {
             _n += std::distance(begin, end);
             _hm += _sum(std::forward<InputIterator>(begin),
                         std::forward<InputIterator>(end),
@@ -534,7 +597,8 @@ struct HarmonicMean {
      * @return     harmonic mean of [begin, end)
      */
     template <typename InputIterator>
-    inline T operator()(InputIterator&& begin, InputIterator&& end) {
+    inline T operator()(InputIterator&& begin, InputIterator&& end)
+    {
         return this->operator()(std::forward<InputIterator>(begin),
                                 std::forward<InputIterator>(end),
                                 [](auto& value) { return value; });
@@ -547,7 +611,8 @@ struct HarmonicMean {
      * @param value
      * @return double
      */
-    inline T operator()(T&& value) {
+    inline T operator()(T&& value)
+    {
         ++_n;
         _hm += _sum(1. / value);
         return _n / _hm;
@@ -555,7 +620,9 @@ struct HarmonicMean {
 };
 
 // FIXME: create online algorithm for this!
-template <int order> struct CentralMoment {
+template <int order>
+struct CentralMoment
+{
     // FIXME: put in online algorithm here here
 };
 
@@ -566,8 +633,9 @@ template <int order> struct CentralMoment {
  * @tparam Sum
  */
 template <typename T, template <typename> class Summation = SumPairwise>
-struct Variance {
-  private:
+struct Variance
+{
+private:
     // using V = std::valarray<T>;
     T _n;
     T _mean;
@@ -577,19 +645,24 @@ struct Variance {
     Summation<T> _sum;
     // enum { n = 0, mean = 1, M2 = 2 };
 
-  public:
+public:
     using value_type = T;
-    Variance()
-        : _n(T()), _mean(T()), _M2(T()), _d(T()), _sum(Summation<T>(T())) {}
+    Variance() : _n(T()), _mean(T()), _M2(T()), _d(T()), _sum(Summation<T>(T()))
+    {
+    }
     virtual ~Variance() = default;
     Variance(const Variance& other) = default;
     Variance(Variance&& other) = default;
     Variance& operator=(const Variance& other) = default;
     Variance& operator=(Variance&& other) = default;
 
-    inline T result() { return _M2 / (_n - 1.); }
+    inline T result()
+    {
+        return _M2 / (_n - 1.);
+    }
 
-    void reset() {
+    void reset()
+    {
         _n = T();
         _mean = T();
         _M2 = T();
@@ -609,8 +682,8 @@ struct Variance {
      * @return    The sample-variance of the range [begin, end)
      */
     template <typename InputIterator, typename Getter>
-    inline T operator()(InputIterator&& begin, InputIterator&& end,
-                        Getter&& getter) {
+    inline T operator()(InputIterator&& begin, InputIterator&& end, Getter&& getter)
+    {
         // this should be changed to returning a numeric vector [_n,
         // _mean, _M2] or even tuple
         _M2 += _sum(std::forward<InputIterator>(begin),
@@ -637,7 +710,8 @@ struct Variance {
      * @return    The sample-variance of the range [begin, end)
      */
     template <typename InputIterator>
-    inline T operator()(InputIterator&& begin, InputIterator&& end) {
+    inline T operator()(InputIterator&& begin, InputIterator&& end)
+    {
         return operator()(std::forward<InputIterator>(begin),
                           std::forward<InputIterator>(end),
                           [](auto& value) { return value; });
@@ -650,7 +724,8 @@ struct Variance {
      * @param value actual value to add
      * @return double updated mean
      */
-    inline T operator()(T&& value) {
+    inline T operator()(T&& value)
+    {
         _n += 1;
         _d = value - _mean;
         _mean += _d / _n;
@@ -666,18 +741,22 @@ struct Variance {
  * @tparam Summation
  */
 template <typename T, template <typename> class Summation = SumPairwise>
-struct Stddev : Variance<T, Summation> {
-  public:
+struct Stddev : Variance<T, Summation>
+{
+public:
     using value_type = T;
     using Base = Variance<T, Summation>;
-    Stddev() : Base() {}
+    Stddev() : Base()
+    {
+    }
     virtual ~Stddev() = default;
     Stddev(const Stddev& other) = default;
     Stddev(Stddev&& other) = default;
     Stddev& operator=(const Stddev& other) = default;
     Stddev& operator=(Stddev&& other) = default;
 
-    inline T result() {
+    inline T result()
+    {
         return std::pow(static_cast<Base&>(*this).result(), 0.5);
     }
 
@@ -695,14 +774,13 @@ struct Stddev : Variance<T, Summation> {
      */
     // FIXME: use partition algorithm for the summation. Possible??
     template <typename InputIterator, typename Getter>
-    inline T operator()(InputIterator&& begin, InputIterator&& end,
-                        Getter&& getter) {
+    inline T operator()(InputIterator&& begin, InputIterator&& end, Getter&& getter)
+    {
         // this should be changed to returning a numeric vector [_n,
         // _mean, _M2] or even tuple
         return std::pow(static_cast<Base&>(*this).operator()(
                             std::forward<InputIterator>(begin),
-                            std::forward<InputIterator>(end),
-                            std::forward<Getter>(getter)),
+                            std::forward<InputIterator>(end), std::forward<Getter>(getter)),
                         0.5);
     }
 
@@ -720,7 +798,8 @@ struct Stddev : Variance<T, Summation> {
      */
     // FIXME: use partition algorithm for the summation.
     template <typename InputIterator>
-    inline T operator()(InputIterator&& begin, InputIterator&& end) {
+    inline T operator()(InputIterator&& begin, InputIterator&& end)
+    {
         return this->operator()(std::forward<InputIterator>(begin),
                                 std::forward<InputIterator>(end),
                                 [](auto& value) { return value; });
@@ -733,9 +812,9 @@ struct Stddev : Variance<T, Summation> {
      * @param value actual value to add
      * @return double updated mean
      */
-    inline T operator()(T&& value) {
-        return std::pow(
-            static_cast<Base&>(*this).operator()(std::forward<T>(value)), 0.5);
+    inline T operator()(T&& value)
+    {
+        return std::pow(static_cast<Base&>(*this).operator()(std::forward<T>(value)), 0.5);
     }
 };
 
@@ -753,8 +832,9 @@ struct Stddev : Variance<T, Summation> {
  * @return     The sample-skewness of [begin, end)
  */
 template <typename T, template <typename> class Summation = SumPairwise>
-struct Skewness {
-  private:
+struct Skewness
+{
+private:
     T _n;
     T _mean;
     T _M2;
@@ -765,17 +845,27 @@ struct Skewness {
     T _term1;
     Summation<T> _sum;
 
-  public:
+public:
     Skewness()
-        : _n(T()), _mean(T()), _M2(T()), _M3(T()), _n1(T()), _delta(T()),
-          _delta_n(T()), _term1(T()), _sum(Summation<T>()) {}
+        : _n(T()),
+          _mean(T()),
+          _M2(T()),
+          _M3(T()),
+          _n1(T()),
+          _delta(T()),
+          _delta_n(T()),
+          _term1(T()),
+          _sum(Summation<T>())
+    {
+    }
     virtual ~Skewness() = default;
     Skewness(const Skewness& other) = default;
     Skewness(Skewness&& other) = default;
     Skewness& operator=(const Skewness& other) = default;
     Skewness& operator=(Skewness&& other) = default;
 
-    void reset() {
+    void reset()
+    {
         _n = 0;
         _mean = 0;
         _M2 = 0;
@@ -787,11 +877,14 @@ struct Skewness {
         _sum.reset();
     }
 
-    T result() { return std::pow(_n, 0.5) * _M3 / std::pow(_M2, 1.5); }
+    T result()
+    {
+        return std::pow(_n, 0.5) * _M3 / std::pow(_M2, 1.5);
+    }
 
     template <typename InputIterator, typename Elementgetter>
-    T operator()(InputIterator&& begin, InputIterator&& end,
-                 Elementgetter&& getter) {
+    T operator()(InputIterator&& begin, InputIterator&& end, Elementgetter&& getter)
+    {
         _M3 += _sum(std::forward<InputIterator>(begin),
                     std::forward<InputIterator>(end), [&](auto& value) {
                         _n1 = _n;
@@ -801,8 +894,7 @@ struct Skewness {
                         _term1 = _delta * _delta_n * _n1;
                         _mean += _delta_n;
 
-                        double M3 =
-                            _term1 * _delta_n * (_n - 2) - 3 * _delta_n * _M2;
+                        double M3 = _term1 * _delta_n * (_n - 2) - 3 * _delta_n * _M2;
                         _M2 += _term1;
                         return M3;
                     });
@@ -824,7 +916,8 @@ struct Skewness {
      * @return     The sample-skewness of [begin, end)
      */
     template <typename InputIterator>
-    T operator()(InputIterator&& begin, InputIterator&& end) {
+    T operator()(InputIterator&& begin, InputIterator&& end)
+    {
         return this->operator()(std::forward<InputIterator>(begin),
                                 std::forward<InputIterator>(end),
                                 [](auto& value) { return value; });
@@ -836,7 +929,8 @@ struct Skewness {
      * @param value
      * @return T
      */
-    T operator()(T&& value) {
+    T operator()(T&& value)
+    {
         _n1 = _n;
         _n += 1;
         _delta = value - _mean;
@@ -865,8 +959,9 @@ struct Skewness {
  */
 
 template <typename T, template <typename> class Summation = SumPairwise>
-struct Kurtosis {
-  private:
+struct Kurtosis
+{
+private:
     T _n;
     T _mean;
     T _M2;
@@ -879,11 +974,21 @@ struct Kurtosis {
     T _term1;
     Summation<T> _sum;
 
-  public:
+public:
     Kurtosis()
-        : _n(T()), _mean(T()), _M2(T()), _M3(T()), _M4(T()), _n1(T()),
-          _delta(T()), _delta_n(T()), _delta_n2(T()), _term1(T()),
-          _sum(Summation<T>()) {}
+        : _n(T()),
+          _mean(T()),
+          _M2(T()),
+          _M3(T()),
+          _M4(T()),
+          _n1(T()),
+          _delta(T()),
+          _delta_n(T()),
+          _delta_n2(T()),
+          _term1(T()),
+          _sum(Summation<T>())
+    {
+    }
 
     virtual ~Kurtosis() = default;
     Kurtosis(const Kurtosis& other) = default;
@@ -891,7 +996,8 @@ struct Kurtosis {
     Kurtosis& operator=(const Kurtosis& other) = default;
     Kurtosis& operator=(Kurtosis&& other) = default;
 
-    void reset() {
+    void reset()
+    {
         _n = 0;
         _mean = 0;
         _M2 = 0;
@@ -905,27 +1011,29 @@ struct Kurtosis {
         _sum.reset();
     }
 
-    T result() { return _n * _M4 / (std::pow(_M2, 2)); }
+    T result()
+    {
+        return _n * _M4 / (std::pow(_M2, 2));
+    }
 
     template <typename InputIterator, typename Elementgetter>
-    double operator()(InputIterator&& begin, InputIterator&& end,
-                      Elementgetter&& getter) {
-        _M4 = _sum(
-            std::forward<InputIterator>(begin),
-            std::forward<InputIterator>(end), [&](auto&& value) {
-                _n1 = _n;
-                _n += 1;
-                _delta = getter(value) - _mean;
-                _delta_n = _delta / _n;
-                _delta_n2 = _delta_n * _delta_n;
-                _term1 = _delta * _delta_n * _n1;
-                _mean += _delta_n;
-                double M4 = _M4 + _term1 * _delta_n2 * (_n * _n - 3 * _n + 3) +
-                            6 * _delta_n2 * _M2 - 4 * _delta_n * _M3;
-                _M3 = _M3 + _term1 * _delta_n * (_n - 2) - 3 * _delta_n * _M2;
-                _M2 = _M2 + _term1;
-                return M4;
-            });
+    double operator()(InputIterator&& begin, InputIterator&& end, Elementgetter&& getter)
+    {
+        _M4 = _sum(std::forward<InputIterator>(begin),
+                   std::forward<InputIterator>(end), [&](auto&& value) {
+                       _n1 = _n;
+                       _n += 1;
+                       _delta = getter(value) - _mean;
+                       _delta_n = _delta / _n;
+                       _delta_n2 = _delta_n * _delta_n;
+                       _term1 = _delta * _delta_n * _n1;
+                       _mean += _delta_n;
+                       double M4 = _M4 + _term1 * _delta_n2 * (_n * _n - 3 * _n + 3) +
+                                   6 * _delta_n2 * _M2 - 4 * _delta_n * _M3;
+                       _M3 = _M3 + _term1 * _delta_n * (_n - 2) - 3 * _delta_n * _M2;
+                       _M2 = _M2 + _term1;
+                       return M4;
+                   });
 
         return _n * _M4 / (std::pow(_M2, 2));
     }
@@ -944,7 +1052,8 @@ struct Kurtosis {
      * @return     The sample-kurtosis [begin, end)
      */
     template <typename InputIterator>
-    double operator()(InputIterator&& begin, InputIterator&& end) {
+    double operator()(InputIterator&& begin, InputIterator&& end)
+    {
         return operator()(std::forward<InputIterator>(begin),
                           std::forward<InputIterator>(end),
                           [](auto& value) { return value; });
@@ -956,7 +1065,8 @@ struct Kurtosis {
      * @param value
      * @return T
      */
-    T operator()(T&& value) {
+    T operator()(T&& value)
+    {
         _n1 = _n;
         _n += 1;
         _delta = value - _mean;
@@ -979,8 +1089,9 @@ struct Kurtosis {
  * @tparam Summation
  */
 template <typename T, template <typename> class Summation = SumPairwise>
-struct ExcessKurtosis : Kurtosis<T, Summation> {
-  public:
+struct ExcessKurtosis : Kurtosis<T, Summation>
+{
+public:
     using Base = Kurtosis<T, Summation>;
     /**
      * @brief      Computes the excess-kurtosis of [begin, end)
@@ -997,11 +1108,10 @@ struct ExcessKurtosis : Kurtosis<T, Summation> {
      * sample-kurtosis-3.0.
      */
     template <typename InputIterator, typename Elementgetter>
-    double operator()(InputIterator&& begin, InputIterator&& end,
-                      Elementgetter&& getter) {
+    double operator()(InputIterator&& begin, InputIterator&& end, Elementgetter&& getter)
+    {
         return static_cast<Base&>(*this).operator()(
-                   std::forward<InputIterator>(begin),
-                   std::forward<InputIterator>(end),
+                   std::forward<InputIterator>(begin), std::forward<InputIterator>(end),
                    std::forward<Elementgetter>(getter)) -
                3.;
     }
@@ -1021,7 +1131,8 @@ struct ExcessKurtosis : Kurtosis<T, Summation> {
      * sample-kurtosis-3.0.
      */
     template <typename InputIterator>
-    T operator()(InputIterator&& begin, InputIterator&& end) {
+    T operator()(InputIterator&& begin, InputIterator&& end)
+    {
         return static_cast<Base&>(*this).operator()(std::forward<T>(begin),
                                                     std::forward<T>(end)) -
                3.;
@@ -1033,9 +1144,9 @@ struct ExcessKurtosis : Kurtosis<T, Summation> {
      * @param value
      * @return T
      */
-    T operator()(T&& value) {
-        return static_cast<Base&>(*this).operator()(std::forward<T>(value)) -
-               3.;
+    T operator()(T&& value)
+    {
+        return static_cast<Base&>(*this).operator()(std::forward<T>(value)) - 3.;
     }
 };
 
@@ -1045,24 +1156,32 @@ struct ExcessKurtosis : Kurtosis<T, Summation> {
  *
  */
 template <typename T, template <typename> class Summation = SumPairwise>
-struct Standardize {
-  private:
+struct Standardize
+{
+private:
     std::vector<T> _zscore;
 
-  public:
-    auto& result() { return _zscore; }
+public:
+    auto& result()
+    {
+        return _zscore;
+    }
 
-    void reset() { return _zscore.clear(); }
+    void reset()
+    {
+        return _zscore.clear();
+    }
 
     template <typename InputIterator, typename Getter>
-    auto operator()(InputIterator&& begin, InputIterator&& end,
-                    Getter&& getter) {
+    auto operator()(InputIterator&& begin, InputIterator&& end, Getter&& getter)
+    {
         T avg = ArithmeticMean<T, Summation>()(begin, end, getter);
         T std = Stddev<T, Summation>()(begin, end, getter);
 
         _zscore.resize(std::distance(begin, end));
         auto vbegin = _zscore.begin();
-        for (; begin != end; ++begin, ++vbegin) {
+        for (; begin != end; ++begin, ++vbegin)
+        {
             *vbegin = (static_cast<long double>(getter(*begin)) - avg) / std;
         }
 
@@ -1070,7 +1189,8 @@ struct Standardize {
     }
 
     template <typename InputIterator>
-    auto operator()(InputIterator&& begin, InputIterator&& end) {
+    auto operator()(InputIterator&& begin, InputIterator&& end)
+    {
         return this->operator()(std::forward<InputIterator>(begin),
                                 std::forward<InputIterator>(end),
                                 [](auto& value) { return value; });
@@ -1097,8 +1217,9 @@ struct Standardize {
  *              cov([begin_first, end_first), [begin_second, end_second))
  */
 template <typename T, template <typename> class Summation = SumPairwise>
-struct Covariance {
-  private:
+struct Covariance
+{
+private:
     T _n;
     T _mean1;
     T _mean2;
@@ -1107,8 +1228,9 @@ struct Covariance {
     T _d2;
     Summation<T> _sum;
 
-  public:
-    void reset() {
+public:
+    void reset()
+    {
         _n = 0;
         _mean1 = 0;
         _mean2 = 0;
@@ -1118,21 +1240,27 @@ struct Covariance {
         _sum.reset();
     }
 
-    T result() { return _M12 * (_n / (_n - 1)); }
+    T result()
+    {
+        return _M12 * (_n / (_n - 1));
+    }
 
-    template <typename InputIterator1, typename InputIterator2,
-              typename Getter1, typename Getter2>
-    double operator()(InputIterator1&& begin_first, InputIterator1&& end_first,
+    template <typename InputIterator1, typename InputIterator2, typename Getter1, typename Getter2>
+    double operator()(InputIterator1&& begin_first,
+                      InputIterator1&& end_first,
                       InputIterator2&& begin_second,
-                      InputIterator2&& end_second, Getter1&& getter1,
-                      Getter2&& getter2) {
+                      InputIterator2&& end_second,
+                      Getter1&& getter1,
+                      Getter2&& getter2)
+    {
         // runs over min(std::distance(begin_first, end_first),
         // begin_second, end_second))
 
-        if (std::distance(begin_first, end_first) !=
-            std::distance(begin_second, end_second)) {
-            throw std::invalid_argument("Iterator ranges have to be of equal "
-                                        "length for computing covariance");
+        if (std::distance(begin_first, end_first) != std::distance(begin_second, end_second))
+        {
+            throw std::invalid_argument(
+                "Iterator ranges have to be of equal "
+                "length for computing covariance");
         }
 
         auto it1 = begin_first;
@@ -1174,8 +1302,11 @@ struct Covariance {
      * end_second))
      */
     template <typename InputIterator1, typename InputIterator2>
-    double operator()(InputIterator1 begin_first, InputIterator1 end_first,
-                      InputIterator2 begin_second, InputIterator2 end_second) {
+    double operator()(InputIterator1 begin_first,
+                      InputIterator1 end_first,
+                      InputIterator2 begin_second,
+                      InputIterator2 end_second)
+    {
         // runs over min(std::distance(begin_first, end_first),
         // begin_second, end_second))
         return operator()(begin_first, end_first, begin_second, end_second,
@@ -1190,7 +1321,8 @@ struct Covariance {
      * @param second
      * @return T
      */
-    T operator()(T&& first, T&& second) {
+    T operator()(T&& first, T&& second)
+    {
         _n += 1;
         _d1 = (first - _mean1) / _n;
         _mean1 += _d1;
@@ -1209,22 +1341,30 @@ struct Covariance {
  */
 
 // FIXME: need to implement P2 algorithm here!
-template <typename T, int percent, typename Comp = IsLess> struct Quantile {
-  private:
+template <typename T, int percent, typename Comp = IsLess>
+struct Quantile
+{
+private:
     T _res;
     Comp _comp;
     static constexpr double _percent = percent;
     // all kinds of other stuff here
-  public:
+public:
     Quantile() = default;
     Quantile(const Quantile& other) = default;
     Quantile(Quantile&& other) = default;
     Quantile& operator=(Quantile&& other) = default;
     Quantile& operator=(const Quantile& other) = default;
 
-    void reset() { _res = 0; }
+    void reset()
+    {
+        _res = 0;
+    }
 
-    T result() { return _res; }
+    T result()
+    {
+        return _res;
+    }
     /**
      * @brief      Computes the 'percent'-th quantile of the distribution.
      *
@@ -1241,12 +1381,14 @@ template <typename T, int percent, typename Comp = IsLess> struct Quantile {
      * @return    The 'percentage'-th quantile of the range [begin, end).
      */
     template <typename InputIterator, typename Getter>
-    T operator()(InputIterator&& begin, InputIterator&& end, Getter&& getter) {
+    T operator()(InputIterator&& begin, InputIterator&& end, Getter&& getter)
+    {
         std::vector<T> temp;
         T size = std::distance(begin, end);
 
         temp.reserve(size);
-        for (auto it = begin; it != end; ++it) {
+        for (auto it = begin; it != end; ++it)
+        {
             temp.emplace_back(getter(*it));
         }
         T idx = size * (_percent / 100.);
@@ -1265,7 +1407,8 @@ template <typename T, int percent, typename Comp = IsLess> struct Quantile {
      * @return double
      */
     template <typename InputIterator>
-    T operator()(InputIterator&& begin, InputIterator&& end) {
+    T operator()(InputIterator&& begin, InputIterator&& end)
+    {
         return operator()(std::forward<InputIterator>(begin),
                           std::forward<InputIterator>(end),
                           [](const auto& value1, const auto& value2) {
@@ -1274,7 +1417,10 @@ template <typename T, int percent, typename Comp = IsLess> struct Quantile {
                           [](auto& value) { return value; });
     }
 
-    T operator()(T&& value) { return 0; }
+    T operator()(T&& value)
+    {
+        return 0;
+    }
 };
 
 /**
@@ -1284,7 +1430,8 @@ template <typename T, int percent, typename Comp = IsLess> struct Quantile {
  * @tparam IsLess
  */
 template <typename T, typename Comp = IsLess>
-struct Median : Quantile<T, 50, Comp> {
+struct Median : Quantile<T, 50, Comp>
+{
     using Base = Quantile<T, 50, Comp>;
 
     Median() = default;
@@ -1304,7 +1451,8 @@ struct Median : Quantile<T, 50, Comp> {
      * @return T
      */
     template <typename InputIterator, typename Getter>
-    T operator()(InputIterator&& begin, InputIterator&& end, Getter&& getter) {
+    T operator()(InputIterator&& begin, InputIterator&& end, Getter&& getter)
+    {
         return static_cast<Base&>(*this).operator()(
             std::forward<InputIterator>(begin),
             std::forward<InputIterator>(end), std::forward<Getter>(getter));
@@ -1321,10 +1469,10 @@ struct Median : Quantile<T, 50, Comp> {
      * @return T
      */
     template <typename InputIterator>
-    T operator()(InputIterator&& begin, InputIterator&& end) {
+    T operator()(InputIterator&& begin, InputIterator&& end)
+    {
         return static_cast<Base&>(*this).operator()(
-            std::forward<InputIterator>(begin),
-            std::forward<InputIterator>(end));
+            std::forward<InputIterator>(begin), std::forward<InputIterator>(end));
     }
 
     /**
@@ -1333,9 +1481,9 @@ struct Median : Quantile<T, 50, Comp> {
      * @param value
      * @return T
      */
-    T operator()(T&& value) {
-        return static_cast<Base&>(*this).operator()(
-            std::forward<T>(std::forward<T>(value)));
+    T operator()(T&& value)
+    {
+        return static_cast<Base&>(*this).operator()(std::forward<T>(std::forward<T>(value)));
     }
 };
 
@@ -1343,22 +1491,24 @@ struct Median : Quantile<T, 50, Comp> {
  * @brief Functor for computing Mode
  *
  */
-template <typename T, class KeyEqual = IsEqual> struct Mode {
-  private:
+template <typename T, class KeyEqual = IsEqual>
+struct Mode
+{
+private:
     std::pair<T, std::size_t> _modecount;
     std::unordered_map<T, std::size_t, std::hash<T>, KeyEqual> _counter;
     T _maxelement;
     std::size_t _maxcount;
 
-  public:
+public:
     /**
      * @brief
      *
      */
-    void reset() {
+    void reset()
+    {
         _modecount.swap(std::pair<T, std::size_t>());
-        _counter.swap(
-            std::unordered_map<T, std::size_t, std::hash<T>, KeyEqual>());
+        _counter.swap(std::unordered_map<T, std::size_t, std::hash<T>, KeyEqual>());
         _maxelement = 0;
         _maxcount = 0;
     }
@@ -1368,9 +1518,13 @@ template <typename T, class KeyEqual = IsEqual> struct Mode {
      *
      * @return auto
      */
-    auto result() { return _maxelement; }
+    auto result()
+    {
+        return _maxelement;
+    }
 
-    auto get_mode_and_count() {
+    auto get_mode_and_count()
+    {
         return std::make_pair(_maxelement, _modecount);
     }
     /**
@@ -1388,10 +1542,13 @@ template <typename T, class KeyEqual = IsEqual> struct Mode {
      * count)
      */
     template <typename InputIterator, typename Getter>
-    T operator()(InputIterator&& begin, InputIterator&& end, Getter&& getter) {
-        for (; begin != end; ++begin) {
+    T operator()(InputIterator&& begin, InputIterator&& end, Getter&& getter)
+    {
+        for (; begin != end; ++begin)
+        {
             ++_counter[getter(*begin)];
-            if (_counter[getter(*begin)] > _maxcount) {
+            if (_counter[getter(*begin)] > _maxcount)
+            {
                 _maxelement = getter(*begin);
                 _maxcount = _counter[getter(*begin)];
             }
@@ -1418,7 +1575,8 @@ template <typename T, class KeyEqual = IsEqual> struct Mode {
      * @return     The mode of the range [begin, end)
      */
     template <typename InputIterator>
-    T operator()(InputIterator&& begin, InputIterator&& end) {
+    T operator()(InputIterator&& begin, InputIterator&& end)
+    {
         return operator()(std::forward<InputIterator>(begin),
                           std::forward<InputIterator>(end),
                           [](auto& value) { return value; });
@@ -1430,9 +1588,11 @@ template <typename T, class KeyEqual = IsEqual> struct Mode {
      * @param value
      * @return std::pair<T, inta>
      */
-    T operator()(T&& value) {
+    T operator()(T&& value)
+    {
         _counter[value] += 1;
-        if (_counter[value] > _maxcount) {
+        if (_counter[value] > _maxcount)
+        {
             _maxelement = value;
             _maxcount = _counter[value];
         }
@@ -1447,15 +1607,23 @@ template <typename T, class KeyEqual = IsEqual> struct Mode {
  * @tparam T
  * @tparam IsLess
  */
-template <typename T, typename Comp = IsLess> struct Minimum {
-  private:
+template <typename T, typename Comp = IsLess>
+struct Minimum
+{
+private:
     T _min;
     Comp _comp;
 
-  public:
-    T result() { return _min; }
+public:
+    T result()
+    {
+        return _min;
+    }
 
-    void reset() { _min = T(); }
+    void reset()
+    {
+        _min = T();
+    }
     /**
      * @brief Computes the minimum of the range [begin, end).
      *
@@ -1467,11 +1635,13 @@ template <typename T, typename Comp = IsLess> struct Minimum {
      * @return auto
      */
     template <typename InputIterator, typename Getter>
-    auto operator()(InputIterator&& begin, InputIterator&& end,
-                    Getter&& getter) {
+    auto operator()(InputIterator&& begin, InputIterator&& end, Getter&& getter)
+    {
         auto value = getter(*begin);
-        for (; begin != end; ++begin) {
-            if (_comp(value, _min)) {
+        for (; begin != end; ++begin)
+        {
+            if (_comp(value, _min))
+            {
                 _min = value;
             }
         }
@@ -1488,7 +1658,8 @@ template <typename T, typename Comp = IsLess> struct Minimum {
      * @return auto
      */
     template <typename InputIterator>
-    auto operator()(InputIterator&& begin, InputIterator&& end) {
+    auto operator()(InputIterator&& begin, InputIterator&& end)
+    {
         return *std::min_element(std::forward<InputIterator>(begin),
                                  std::forward<InputIterator>(end), _comp);
     }
@@ -1499,8 +1670,10 @@ template <typename T, typename Comp = IsLess> struct Minimum {
      * @param value
      * @return T
      */
-    T operator()(T&& value) {
-        if (_comp(value, _min)) {
+    T operator()(T&& value)
+    {
+        if (_comp(value, _min))
+        {
             _min = value;
         }
 
@@ -1514,15 +1687,23 @@ template <typename T, typename Comp = IsLess> struct Minimum {
  * @tparam T
  * @tparam IsLess
  */
-template <typename T, typename Comp = IsLess> struct Maximum {
-  private:
+template <typename T, typename Comp = IsLess>
+struct Maximum
+{
+private:
     T _max;
     Comp _comp;
 
-  public:
-    T result() { return _max; }
+public:
+    T result()
+    {
+        return _max;
+    }
 
-    void reset() { _max = T(); }
+    void reset()
+    {
+        _max = T();
+    }
     /**
      * @brief Computes the maximum of the range [begin, end).
      *
@@ -1534,9 +1715,12 @@ template <typename T, typename Comp = IsLess> struct Maximum {
      * @return auto
      */
     template <typename InputIterator, typename Getter>
-    T operator()(InputIterator&& begin, InputIterator&& end, Getter&& getter) {
-        for (; begin != end; ++begin) {
-            if (_comp(_max, getter(*begin))) {
+    T operator()(InputIterator&& begin, InputIterator&& end, Getter&& getter)
+    {
+        for (; begin != end; ++begin)
+        {
+            if (_comp(_max, getter(*begin)))
+            {
                 _max = getter(*begin);
             }
         }
@@ -1554,7 +1738,8 @@ template <typename T, typename Comp = IsLess> struct Maximum {
      * @return auto
      */
     template <typename InputIterator>
-    T operator()(InputIterator&& begin, InputIterator&& end) {
+    T operator()(InputIterator&& begin, InputIterator&& end)
+    {
         return this->operator()(std::forward<InputIterator>(begin),
                                 std::forward<InputIterator>(end),
                                 [](auto& value) { return value; });
@@ -1566,8 +1751,10 @@ template <typename T, typename Comp = IsLess> struct Maximum {
      * @param value
      * @return T
      */
-    T operator()(T&& value) {
-        if (_comp(_max, value)) {
+    T operator()(T&& value)
+    {
+        if (_comp(_max, value))
+        {
             _max = value;
         }
         return _max;
@@ -1578,11 +1765,12 @@ template <typename T, typename Comp = IsLess> struct Maximum {
  * @brief
  *
  */
-struct Sample {
-  private:
+struct Sample
+{
+private:
     double _share;
 
-  public:
+public:
     /**
      * @brief      Function to generate a random sample of relative
      *              size 'percent' from a range [begin, end).
@@ -1599,8 +1787,8 @@ struct Sample {
      * iterators.
      */
     template <typename InputIterator, typename Getter>
-    auto operator()(InputIterator&& begin, InputIterator&& end,
-                    Getter&& getter) {
+    auto operator()(InputIterator&& begin, InputIterator&& end, Getter&& getter)
+    {
         std::size_t size = std::distance(begin, end);
         std::size_t shr = (_share / 100.) * size;
         std::vector<typename std::result_of<Getter>::type> smpl(shr);
@@ -1611,7 +1799,8 @@ struct Sample {
         std::shuffle(indices.begin(), indices.end(), generator);
 
         auto smpl_it = smpl.begin();
-        for (std::size_t i = 0; i < shr; ++i) {
+        for (std::size_t i = 0; i < shr; ++i)
+        {
             *smpl_it = getter(std::next(begin, indices[i]));
             ++smpl_it;
         }
@@ -1634,7 +1823,8 @@ struct Sample {
      * iterators.
      */
     template <typename InputIterator>
-    auto operator()(InputIterator begin, InputIterator end) {
+    auto operator()(InputIterator begin, InputIterator end)
+    {
         return operator()(std::forward<InputIterator>(begin),
                           std::forward<InputIterator>(end),
                           [](auto& value) { return value; });
@@ -1649,23 +1839,25 @@ struct Sample {
  */
 // FIXME: this needs some way to convey the template argumets for the functions,
 // such that I do not need them to be given explicitly all the time.
-template <typename... Funcs> struct Statistician {
-  public:
-    using value_type =
-        typename std::tuple_element_t<0, std::tuple<Funcs...>>::value_type;
+template <typename... Funcs>
+struct Statistician
+{
+public:
+    using value_type = typename std::tuple_element_t<0, std::tuple<Funcs...>>::value_type;
     using ResArr = std::array<value_type, sizeof...(Funcs)>;
 
-  private:
+private:
     std::tuple<Funcs...> _funcs;
     ResArr _res;
 
-  public:
+public:
     /**
      * @brief
      *
      * @return auto
      */
-    auto result() {
+    auto result()
+    {
         _res = tuple_reduce<ResArr>(
             [&](auto& f) -> value_type { return f.result(); }, _funcs);
         return _res;
@@ -1675,7 +1867,8 @@ template <typename... Funcs> struct Statistician {
      * @brief
      *
      */
-    void reset() {
+    void reset()
+    {
         tuple_reduce<void>([&](auto& f) { f.reset(); }, _funcs);
     }
 
@@ -1683,7 +1876,9 @@ template <typename... Funcs> struct Statistician {
      * @brief Construct a new Statistician object
      *
      */
-    Statistician() : _funcs(std::make_tuple(Funcs()...)), _res(ResArr()) {}
+    Statistician() : _funcs(std::make_tuple(Funcs()...)), _res(ResArr())
+    {
+    }
 
     /**
      * @brief Construct a new Statistician object
@@ -1732,9 +1927,10 @@ template <typename... Funcs> struct Statistician {
      * @return auto
      */
     template <typename InputIterator, typename Getter>
-    auto operator()(InputIterator&& begin, InputIterator&& end,
-                    Getter&& getter) {
-        for (; begin != end; ++begin) {
+    auto operator()(InputIterator&& begin, InputIterator&& end, Getter&& getter)
+    {
+        for (; begin != end; ++begin)
+        {
             tuple_reduce<void>([&](auto&& f) { f(getter(*begin)); }, _funcs);
         }
 
@@ -1752,7 +1948,8 @@ template <typename... Funcs> struct Statistician {
      * @return auto
      */
     template <typename InputIterator>
-    auto operator()(InputIterator&& begin, InputIterator&& end) {
+    auto operator()(InputIterator&& begin, InputIterator&& end)
+    {
         return this->operator()(std::forward<InputIterator>(begin),
                                 std::forward<InputIterator>(end),
                                 [](auto& value) { return value; });
@@ -1773,15 +1970,18 @@ template <typename... Funcs> struct Statistician {
      * @param getter2
      * @return auto
      */
-    template <typename InputIterator1, typename InputIterator2,
-              typename Getter1, typename Getter2>
-    auto operator()(InputIterator1&& begin1, InputIterator1&& end1,
-                    InputIterator2&& begin2, InputIterator2&& end2,
-                    Getter1&& getter1, Getter2&& getter2) {
-        for (; begin1 != end1 && begin2 != end2; ++begin1, ++begin2) {
+    template <typename InputIterator1, typename InputIterator2, typename Getter1, typename Getter2>
+    auto operator()(InputIterator1&& begin1,
+                    InputIterator1&& end1,
+                    InputIterator2&& begin2,
+                    InputIterator2&& end2,
+                    Getter1&& getter1,
+                    Getter2&& getter2)
+    {
+        for (; begin1 != end1 && begin2 != end2; ++begin1, ++begin2)
+        {
             tuple_reduce<void>(
-                [&](auto& f) { f(getter1(*begin1), getter2(*begin2)); },
-                _funcs);
+                [&](auto& f) { f(getter1(*begin1), getter2(*begin2)); }, _funcs);
         }
 
         _res = tuple_reduce<ResArr>(
@@ -1801,14 +2001,15 @@ template <typename... Funcs> struct Statistician {
      * @return auto
      */
     template <typename InputIterator1, typename InputIterator2>
-    auto operator()(InputIterator1&& begin1, InputIterator1&& end1,
-                    InputIterator2&& begin2, InputIterator2&& end2) {
-        return this->operator()(std::forward<InputIterator1>(begin1),
-                                std::forward<InputIterator1>(end1),
-                                std::forward<InputIterator2>(begin2),
-                                std::forward<InputIterator2>(end2),
-                                [](auto& v) { return v; },
-                                [](auto& v) { return v; });
+    auto operator()(InputIterator1&& begin1,
+                    InputIterator1&& end1,
+                    InputIterator2&& begin2,
+                    InputIterator2&& end2)
+    {
+        return this->operator()(
+            std::forward<InputIterator1>(begin1), std::forward<InputIterator1>(end1),
+            std::forward<InputIterator2>(begin2), std::forward<InputIterator2>(end2),
+            [](auto& v) { return v; }, [](auto& v) { return v; });
     }
 
     /**
@@ -1818,15 +2019,14 @@ template <typename... Funcs> struct Statistician {
      * @param value Single value to update the functors with
      * @return auto
      */
-    auto operator()(value_type&& value1, value_type&& value2) {
+    auto operator()(value_type&& value1, value_type&& value2)
+    {
         tuple_reduce(
             [&](auto& f) {
-                f(std::forward<value_type>(value1),
-                  std::forward<value_type>(value2));
+                f(std::forward<value_type>(value1), std::forward<value_type>(value2));
             },
             _funcs);
-        _res = tuple_reduce<std::array>([](auto& f) { return f.result(); },
-                                        _funcs);
+        _res = tuple_reduce<std::array>([](auto& f) { return f.result(); }, _funcs);
         return _res;
     }
 };

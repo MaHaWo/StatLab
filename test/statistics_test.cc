@@ -10,48 +10,73 @@ using namespace Statistics;
 using namespace std::literals::chrono_literals;
 
 template <typename T>
-void to_csv(std::string filename, std::string header,
-            std::vector<T>& container) {
+void to_csv(std::string filename, std::string header, std::vector<T>& container)
+{
     std::ofstream file(filename, std::ios::out | std::ios::trunc);
     file << header << "\n";
-    for (auto& v : container) {
+    for (auto& v : container)
+    {
         file << std::setprecision(16) << v << "\n";
     }
 }
 
-template <typename T> std::vector<T> from_csv(std::string filename) {
+template <typename T>
+std::vector<std::vector<T>> from_csv(std::string filename, char sep = ',');
+{
     std::ifstream file(filename, std::ios::in);
     // get number of lines in file
     std::string line;
-    std::vector<T> data;
     std::size_t number_of_lines = 0;
-    while (std::getline(file, line)) {
+    while (std::getline(file, line))
+    {
         ++number_of_lines;
     }
+
     file.clear();
     file.seekg(0, std::ios::beg);
     data.resize(number_of_lines - 1); // header ignore
     std::getline(file, line);         // header ignore
-    for (std::size_t i = 0; i < data.size(); ++i) {
+    std::istringstream s(line, std::ios::trunc);
+    // get number of columns by counting separator occurance:
+    // col_num = sep_num+1
+    std::size_t number_of_cols = std::count(s.str().begin(), s.str().end(), sep) + 1;
+
+    std::vector<std::vector<T>> data(number_of_lines, std::vector<T>(number_of_cols, 0.));
+
+    // value buffer
+    std::string value = "";
+
+    for (std::size_t i = 0; i < data.size(); ++i)
+    {
         std::getline(file, line);
-        std::istringstream s(line);
-        s >> data[i];
+        for (std::size_t j = 0; std::getline(s, value, sep); ++j)
+        {
+            data[i][j] = std::stod(s);
+            s.str("");
+            value.resize(0);
+        }
     }
     return data;
 }
 
-template <typename Iter> auto moment(int order, Iter&& begin, Iter&& end) {
+template <typename Iter>
+auto moment(int order, Iter&& begin, Iter&& end)
+{
     double m = std::accumulate(begin, end, 0., [&](auto& lhs, auto& rhs) {
         return lhs + std::pow(rhs, order);
     });
     return m / double(std::distance(begin, end));
 }
 
-template <typename Iter> auto mean(Iter&& begin, Iter&& end) {
+template <typename Iter>
+auto mean(Iter&& begin, Iter&& end)
+{
     return moment(1, std::forward<Iter>(begin), std::forward<Iter>(end));
 }
 
-template <typename Iter> auto variance(Iter&& begin, Iter&& end) {
+template <typename Iter>
+auto variance(Iter&& begin, Iter&& end)
+{
     double m = mean(std::forward<Iter>(begin), std::forward<Iter>(end));
     double v = std::accumulate(begin, end, 0., [&](auto& lhs, auto& rhs) {
         return lhs + std::pow(rhs - m, 2);
@@ -59,7 +84,8 @@ template <typename Iter> auto variance(Iter&& begin, Iter&& end) {
     return v / double(std::distance(begin, end));
 }
 
-int main() {
+int main()
+{
     // std::this_thread::sleep_for(20s);
     std::default_random_engine rng(347285);
     std::normal_distribution<double> n(0., 1.);
@@ -100,8 +126,7 @@ int main() {
               << std::setprecision(16) << std::setw(18)
               << " stdk: " << stdk(v.begin(), v.end()) << " \n"
               << std::setprecision(16) << std::setw(18)
-              << " naive: " << std::pow(variance(v.begin(), v.end()), 0.5)
-              << std::endl;
+              << " naive: " << std::pow(variance(v.begin(), v.end()), 0.5) << std::endl;
 
     Skewness<double, SumNaive> skn;
     Skewness<double, SumPairwise> skp;
@@ -126,22 +151,19 @@ int main() {
               << " kk: " << kk(v.begin(), v.end()) << std::endl;
 
     ArithmeticMean<double, SumPairwise> amp;
-    for (auto& value : v) {
+    for (auto& value : v)
+    {
         amp(std::forward<double>(value));
     }
     std::cout << "arithmetic mean: " << amp.result() << std::endl;
     amp.reset();
-    std::cout << "arithmetic mean using range: " << amp(v.begin(), v.end())
-              << std::endl;
-    Statistician<ArithmeticMean<double, SumPairwise>,
-                 Variance<double, SumPairwise>>
-        statistician;
+    std::cout << "arithmetic mean using range: " << amp(v.begin(), v.end()) << std::endl;
+    Statistician<ArithmeticMean<double, SumPairwise>, Variance<double, SumPairwise>> statistician;
 
     auto mean_var = statistician(v.begin(), v.end());
     std::cout << "Arithmetic Mean: " << std::endl;
     std::cout << " singular    : "
-              << ArithmeticMean<double, SumPairwise>()(v.begin(), v.end())
-              << "\n"
+              << ArithmeticMean<double, SumPairwise>()(v.begin(), v.end()) << "\n"
               << " statistician: " << mean_var[0]
               << "\n naive       : " << mean(v.begin(), v.end()) << std::endl;
 
@@ -149,8 +171,7 @@ int main() {
     std::cout << " singular    : "
               << Variance<double, SumPairwise>()(v.begin(), v.end()) << "\n"
               << " statistician: " << mean_var[1]
-              << "\n naive       : " << variance(v.begin(), v.end())
-              << std::endl;
+              << "\n naive       : " << variance(v.begin(), v.end()) << std::endl;
 
     using T = double;
     ArithmeticMean<T, SumNaive> am;
@@ -158,26 +179,23 @@ int main() {
     Skewness<T, SumNaive> sm;
     Kurtosis<T, SumNaive> km;
 
-    Statistician<ArithmeticMean<T, SumPairwise>, Variance<T, SumPairwise>,
-                 Skewness<T, SumPairwise>, Kurtosis<T, SumPairwise>>
-        new_statistician;
+    Statistician<ArithmeticMean<T, SumPairwise>, Variance<T, SumPairwise>, Skewness<T, SumPairwise>, Kurtosis<T, SumPairwise>> new_statistician;
 
     auto statres = new_statistician(v.begin(), v.end());
-    auto statres_i =
-        std::vector<T>{am(v.begin(), v.end()), vm(v.begin(), v.end()),
-                       sm(v.begin(), v.end()), km(v.begin(), v.end())};
+    auto statres_i = std::vector<T>{am(v.begin(), v.end()), vm(v.begin(), v.end()),
+                                    sm(v.begin(), v.end()), km(v.begin(), v.end())};
 
     std::array<std::string, 4> functionnames{
         {"mean", "variance", "skewness", "kurtosis"}};
 
     std::cout << "Test Statistician against singular functions" << std::endl;
 
-    for (std::size_t i = 0; i < statres.size(); ++i) {
+    for (std::size_t i = 0; i < statres.size(); ++i)
+    {
         std::cout << functionnames[i] << "\n"
                   << std::setprecision(16) << std::setw(16)
                   << "statistician: " << statres[i] << "\n"
-                  << std::setw(16) << " singular: " << statres_i[i]
-                  << std::endl;
+                  << std::setw(16) << " singular: " << statres_i[i] << std::endl;
         std::cout << std::endl;
     }
     return 0;

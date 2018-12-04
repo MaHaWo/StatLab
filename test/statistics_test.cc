@@ -72,20 +72,59 @@ int main()
     Statistician<Mean<SumPairwise>, Std<SumPairwise>, Min, Max, Skew<SumPairwise>, EKur<SumPairwise>> StatP;
     Statistician<Mean<SumKahan>, Std<SumKahan>, Min, Max, Skew<SumKahan>, EKur<SumKahan>> StatK;
 
+    double m = std::accumulate(v.begin(), v.end(), 0.) / v.size();
+    double s = std::accumulate(
+                   v.begin(), v.end(), 0.,
+                   [&m](auto& a, auto& b) { return a + std::pow(b - m, 2.); }) /
+               (v.size() - 1);
+
+    double min = *std::min_element(v.begin(), v.end());
+    double max = *std::max_element(v.begin(), v.end());
+    double sk = 0.;
+    double ek = 0.;
+
+    std::vector<double> simplevalues{m, s, min, max, sk, ek};
     StatN(v.begin(), v.end());
     StatP(v.begin(), v.end());
     StatK(v.begin(), v.end());
 
-    std::cout << std::setw(25) << "name" << std::setw(25) << "Pandas"
-              << std::setw(25) << "Naive" << std::setw(25) << "Pairwise"
-              << std::setw(25) << "Kahan" << std::endl;
+    std::cout << std::setw(25) << "name" << std::setw(25) << "Simple"
+              << std::setw(25) << "Pandas" << std::setw(25) << "Naive"
+              << std::setw(25) << "Pairwise" << std::setw(25) << "Kahan" << std::endl;
+
     for (std::size_t i = 0; i < ddsv.size(); ++i)
     {
         std::cout << std::setw(25) << names[i] << std::setprecision(16)
-                  << std::setw(25) << ddsv[i] << std::setw(25)
-                  << StatN.result()[i] << std::setw(25) << StatP.result()[i]
-                  << std::setw(25) << StatK.result()[i] << std::endl;
+                  << std::setw(25) << simplevalues[i] << std::setw(25)
+                  << ddsv[i] << std::setw(25) << StatN.result()[i]
+                  << std::setw(25) << StatP.result()[i] << std::setw(25)
+                  << StatK.result()[i] << std::endl;
     }
 
+    Mean<SumNaive> mn;
+    Mean<SumPairwise> mp;
+    Mean<SumKahan> mk;
+
+    Std<SumNaive> stdn;
+    Std<SumPairwise> stdp;
+    Std<SumKahan> stdk;
+
+    mn(v.begin(), v.end());
+    mp(v.begin(), v.end());
+    mk(v.begin(), v.end());
+
+    stdn(v.begin(), v.end());
+    stdp(v.begin(), v.end());
+    stdk(v.begin(), v.end());
+
+    std::cout << std::setw(25) << "Simple" << std::setw(25) << "Pandas"
+              << std::setw(25) << "Naive" << std::setw(25) << "Pairwise"
+              << std::setw(25) << "Kahan" << std::endl;
+    std::cout << std::setw(25) << m << std::setw(25) << std::setw(25) << ddsv[0]
+              << std::setw(25) << mn.result() << std::setw(25) << mp.result()
+              << std::setw(25) << mk.result() << std::endl;
+    std::cout << std::setw(25) << s << std::setw(25) << ddsv[1] << std::setw(25)
+              << stdn.result() << std::setw(25) << stdp.result()
+              << std::setw(25) << stdk.result() << std::endl;
     return 0;
 }

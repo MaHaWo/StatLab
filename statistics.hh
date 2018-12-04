@@ -469,9 +469,10 @@ public:
                           std::forward<InputIterator>(end),
                           [&getter](auto&& value) -> value_type {
                               return std::pow(getter(value), order);
-                          });
+                          }) /
+                     _n;
         }
-        return _mmnt / _n;
+        return _mmnt;
     }
 
     /**
@@ -1093,6 +1094,11 @@ struct ExcessKurtosis : Kurtosis<T, Summation>
 {
 public:
     using Base = Kurtosis<T, Summation>;
+
+    T result()
+    {
+        return static_cast<Base*>(this)->result() - 3.;
+    }
     /**
      * @brief      Computes the excess-kurtosis of [begin, end)
      *

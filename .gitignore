@@ -1,4 +1,9 @@
-.vscode/settings.json
-test/stattest
-test/stattest.dSYM/Contents/Info.plist
-test/stattest.dSYM/Contents/Resources/DWARF/stattest
+# ignore everything
+*
+
+# whitelist what's needed
+
+!test/*.cc
+!*.hh
+!test/*.py
+!test/*.csv

@@ -1,130 +1,98 @@
-#include "../statistics.hh"
+/**
+ * @todo - device test case for floating point accuracy
+ * @todo - check pairwise summation -> something feels wrong there
+ * @todo - get a way to automatically determine significant digits
+           and adjust tolerance of comparison accordingly
+ * @todo - compare with boost -> is there anyway
+ */
+
+#include "../include/statistics.hh"
+#include "../include/test_utils.hh"
 #include <fstream>
 #include <iomanip>
 #include <iostream>
-#include <optional>
 #include <random>
-#include <sstream>
-#include <thread>
 #include <vector>
+
 using namespace Statistics;
 using namespace std::literals::chrono_literals;
 
-template <typename T>
-std::vector<T> generate_data(bool read, std::size_t size = 1000000, bool write = false)
+template <typename Distribution>
+auto generate_sample(std::size_t samplesize, std::size_t seed, Distribution&& dist, bool write)
 {
-    if (!read)
-    {
-        std::default_random_engine rng(347285);
-        std::normal_distribution<T> n(0., 1.);
-        std::vector<T> v(size);
-        std::generate(v.begin(), v.end(), [&]() { return n(rng); });
-        if (write)
-        {
-            std::ofstream file(
-                "data.bin", std::ios::out | std::ios::binary | std::ios::trunc);
-            file.write(reinterpret_cast<char*>(&size), sizeof(std::size_t));
-            file.write(reinterpret_cast<char*>(v.data()), sizeof(T) * size);
-        }
-        return v;
-    }
-    else
-    {
-        std::vector<T> data;
-        std::ifstream file("data.bin", std::ios::in | std::ios::binary);
-        std::size_t s = 0;
-        file.read(reinterpret_cast<char*>(&s), sizeof(std::size_t));
-        data.resize(s);
-        file.read(reinterpret_cast<char*>(data.data()), s * sizeof(T));
-        return data;
-    }
-}
+    using T = typename Distribution::result_type;
+    std::mt19937 generator(seed);
+    std::vector<T> data(samplesize);
+    std::generate(data.begin(), data.end(), [&]() { return dist(generator); });
 
-template <typename T>
-auto read_test_results(std::string filename, std::size_t size)
-{
-    std::ifstream file(filename, std::ios::in | std::ios::binary);
-    std::vector<T> data(size);
-    file.read(reinterpret_cast<char*>(data.data()), size * sizeof(T));
+    if (write)
+    {
+        std::fstream file("data.bin", std::ios::out | std::ios::binary);
+        file.write(reinterpret_cast<char*>(data.data()),
+                   sizeof(typename decltype(data)::value_type) * samplesize);
+    }
+
     return data;
 }
 
-template <template <typename> class Sum>
-using Mean = ArithmeticMean<double, Sum>;
-template <template <typename> class Sum>
-using Std = Stddev<double, Sum>;
-using Min = Minimum<double>;
-using Max = Maximum<double>;
-template <template <typename> class Sum>
-using Skew = Skewness<double, Sum>;
-template <template <typename> class Sum>
-using EKur = ExcessKurtosis<double, Sum>;
-
 int main()
 {
-    // std::this_thread::sleep_for(20s);
-    auto v = generate_data<double>(false, 1000000, true);
-    auto ddsv = read_test_results<double>("description.bin", 10);
-    ddsv = decltype(ddsv){ddsv[1], ddsv[2], ddsv[3], ddsv[7], ddsv[8], ddsv[9]};
-    std::vector<std::string> names{"mean", "std",      "min",
-                                   "max",  "skewness", "excess_kurtosis"};
-    Statistician<Mean<SumNaive>, Std<SumNaive>, Min, Max, Skew<SumNaive>, EKur<SumNaive>> StatN;
-    Statistician<Mean<SumPairwise>, Std<SumPairwise>, Min, Max, Skew<SumPairwise>, EKur<SumPairwise>> StatP;
-    Statistician<Mean<SumKahan>, Std<SumKahan>, Min, Max, Skew<SumKahan>, EKur<SumKahan>> StatK;
+    auto data = generate_sample(10000, 75843, std::normal_distribution<double>(0, 5), true);
 
-    double m = std::accumulate(v.begin(), v.end(), 0.) / v.size();
-    double s = std::accumulate(
-                   v.begin(), v.end(), 0.,
-                   [&m](auto& a, auto& b) { return a + std::pow(b - m, 2.); }) /
-               (v.size() - 1);
+    // test summation
+    SumPairwise<double> sum_pairwise;
+    SumKahan<double> sum_kahan;
 
-    double min = *std::min_element(v.begin(), v.end());
-    double max = *std::max_element(v.begin(), v.end());
-    double sk = 0.;
-    double ek = 0.;
+    auto pairwisesum = sum_pairwise(data.begin(), data.end());
+    auto kahansum = sum_kahan(data.begin(), data.end());
+    double pythonsum = 429.451407544296; // put fucking floating point to 1.....
+    double pythonkahansum = 429.4514075442959; // put fucking floating point to 1.....
 
-    std::vector<double> simplevalues{m, s, min, max, sk, ek};
-    StatN(v.begin(), v.end());
-    StatP(v.begin(), v.end());
-    StatK(v.begin(), v.end());
+    ASSERT_EQ_CUSTOM(pairwisesum, pythonsum, 2.4e-13);
+    ASSERT_EQ_CUSTOM(kahansum, pythonkahansum, 1e-16);
 
-    std::cout << std::setw(25) << "name" << std::setw(25) << "Simple"
-              << std::setw(25) << "Pandas" << std::setw(25) << "Naive"
-              << std::setw(25) << "Pairwise" << std::setw(25) << "Kahan" << std::endl;
+    // test mean
+    ArithmeticMean<double, SumPairwise> pairwise_mean;
+    ArithmeticMean<double, SumKahan> kahan_mean;
 
-    for (std::size_t i = 0; i < ddsv.size(); ++i)
-    {
-        std::cout << std::setw(25) << names[i] << std::setprecision(16)
-                  << std::setw(25) << simplevalues[i] << std::setw(25)
-                  << ddsv[i] << std::setw(25) << StatN.result()[i]
-                  << std::setw(25) << StatP.result()[i] << std::setw(25)
-                  << StatK.result()[i] << std::endl;
-    }
+    double pairwise_arithmeticmean = pairwise_mean(data.begin(), data.end());
+    double kahan_arithmeticmean = kahan_mean(data.begin(), data.end());
+    double python_arithmeticmean = 0.0429451407544296;
+    double python_kahanmean = 0.04294514075442959;
+    double test_mean = std::accumulate(data.begin(), data.end(), 0.) / data.size();
+    ASSERT_EQ_CUSTOM(pairwise_arithmeticmean, python_arithmeticmean, 1e-16);
+    ASSERT_EQ_CUSTOM(kahan_arithmeticmean, python_kahanmean, 1e-16);
 
-    Mean<SumNaive> mn;
-    Mean<SumPairwise> mp;
-    Mean<SumKahan> mk;
+    // Test Variance
+    Variance<double, SumKahan> variance;
+    double var = variance(data.begin(), data.end());
 
-    Std<SumNaive> stdn;
-    Std<SumPairwise> stdp;
-    Std<SumKahan> stdk;
+    double pythonvariance = 25.636281809383632;
+    double testvariance = std::accumulate(data.begin(), data.end(), 0.,
+                                          [&](auto&& r, auto&& v) {
+                                              return r + (v - test_mean) * (v - test_mean);
+                                          }) /
+                          (data.size() - 1);
 
-    mn(v.begin(), v.end());
-    mp(v.begin(), v.end());
-    mk(v.begin(), v.end());
+    // FIXME: find reason for the large differences here!
+    ASSERT_EQ_CUSTOM(var, pythonvariance, 2.5e-14);
+    ASSERT_EQ_CUSTOM(var, testvariance, 5.4e-14);
 
-    stdn(v.begin(), v.end());
-    stdp(v.begin(), v.end());
-    stdk(v.begin(), v.end());
+    // Test skewness
+    Skewness<double, SumKahan> skewness;
+    double pythonskewness = -0.0057856842695107645;
+    double skew = skewness(data.begin(), data.end());
+    ASSERT_EQ_CUSTOM(skew, pythonskewness, 5e-16);
 
-    std::cout << std::setw(25) << "Simple" << std::setw(25) << "Pandas"
-              << std::setw(25) << "Naive" << std::setw(25) << "Pairwise"
-              << std::setw(25) << "Kahan" << std::endl;
-    std::cout << std::setw(25) << m << std::setw(25) << std::setw(25) << ddsv[0]
-              << std::setw(25) << mn.result() << std::setw(25) << mp.result()
-              << std::setw(25) << mk.result() << std::endl;
-    std::cout << std::setw(25) << s << std::setw(25) << ddsv[1] << std::setw(25)
-              << stdn.result() << std::setw(25) << stdp.result()
-              << std::setw(25) << stdk.result() << std::endl;
+    // Test kurtosis
+    Kurtosis<double, SumPairwise> kurtosis_pairwise;
+    Kurtosis<double, SumKahan> kurtosis;
+
+    double pythonkurtosis = 0.01342924877361451;
+    double kur = kurtosis(data.begin(), data.end());
+    double pkur = kurtosis_pairwise(data.begin(), data.end());
+    ASSERT_EQ_CUSTOM(kur, pythonkurtosis, 4e-15);
+    ASSERT_EQ_CUSTOM(pkur, pythonkurtosis, 3e-14);
+
     return 0;
 }

@@ -1,9 +1,10 @@
 # ignore everything
 *
 
-# whitelist what's needed
-
-!test/*.cc
-!*.hh
-!test/*.py
-!test/*.csv
+# unignore stuff we want to keep
+!.gitignore
+!*/*.txt
+!*/*.cc
+!*/*.hh
+!*/*.py
+!*/*.csv

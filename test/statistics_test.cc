@@ -40,7 +40,7 @@ int main()
     auto data = generate_sample(10000, 75843, std::normal_distribution<double>(0, 5), true);
 
     // test summation
-    SumPairwise<double> sum_pairwise;
+    Sum<double> sum_pairwise;
     SumKahan<double> sum_kahan;
 
     auto pairwisesum = sum_pairwise(data.begin(), data.end());
@@ -52,7 +52,7 @@ int main()
     ASSERT_EQ_CUSTOM(kahansum, pythonkahansum, 1e-16);
 
     // test mean
-    ArithmeticMean<double, SumPairwise> pairwise_mean;
+    ArithmeticMean<double, Sum> pairwise_mean;
     ArithmeticMean<double, SumKahan> kahan_mean;
 
     double pairwise_arithmeticmean = pairwise_mean(data.begin(), data.end());
@@ -85,7 +85,7 @@ int main()
     ASSERT_EQ_CUSTOM(skew, pythonskewness, 5e-16);
 
     // Test kurtosis
-    Kurtosis<double, SumPairwise> kurtosis_pairwise;
+    Kurtosis<double, Sum> kurtosis_pairwise;
     Kurtosis<double, SumKahan> kurtosis;
 
     double pythonkurtosis = 0.01342924877361451;

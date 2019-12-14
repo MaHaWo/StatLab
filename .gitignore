@@ -1,10 +1,15 @@
 # ignore everything
 *
 
+# but allow subfolder descent
+!*/**
+
 # unignore stuff we want to keep
 !.gitignore
-!*/*.txt
-!*/*.cc
-!*/*.hh
-!*/*.py
-!*/*.csv
+!*/**/*.txt
+!*/**/*.cc
+!*/**/*.hh
+!*/**/*.hpp
+!*/**/*.cpp
+!*/**/*.py
+!*/**/*.csv

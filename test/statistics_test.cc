@@ -6,8 +6,8 @@
  * @todo - compare with boost -> is there anyway
  */
 
-#include "../include/statistics.hh"
-#include "../include/test_utils.hh"
+#include "../include/statistics.hpp"
+#include "../include/test_utils.hpp"
 #include <fstream>
 #include <iomanip>
 #include <iostream>

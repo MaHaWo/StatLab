@@ -1,25 +1,17 @@
-# --- TESTS ---
-# All tests registered with 'add_test' will be run when calling 'make test'
-#
-# NOTE: CTest does *not* compile its test executables. Running 'make test'
-# *without* compiling the appropriate executable will cause the test to fail!
-#
-# add test as regular executable
-add_executable(statistics_test statistics_test.cc)
-target_compile_options(statistics_test
-    PRIVATE
-        $<$<CONFIG:DEBUG>:--coverage>
-)
-# link the library to it
-target_link_libraries(statistics_test
-    # can stay private, this target is never exported
-    PRIVATE
-        statistics
-        $<$<CONFIG:DEBUG>:--coverage>
-)
+# include custom add_test function stolen from here: 
+# https://eb2.co/blog/2015/06/driving-boost.test-with-cmake/
+include(BoostTestHelpers)
 
-# register the test in CTest
-add_test(NAME test-statistics
-    # automatically replaces target name with executable location
-    COMMAND statistics_test
-)
+# find boost unit test framework
+find_package(Boost COMPONENTS unit_test_framework REQUIRED)
+
+# add boost include directory to look for headers
+include_directories( ${Boost_INCLUDE_DIR} )
+
+# copy file to the test directory
+#configure_file(normal_0_1_data.csv ../test/normal_0_1_data.csv COPYONLY)
+
+# needed to use boost unit_test dynamic library to generate main function
+# for tests. FIXME: Problematic upon compiler switches!
+add_definitions(-DBOOST_TEST_DYN_LINK) 
+add_boost_test(statistics_test.cpp StatLab)

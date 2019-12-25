@@ -12,11 +12,18 @@
 using namespace Statistics;
 using namespace std::literals::chrono_literals;
 
+struct Thing
+{
+    double      v;
+    std::string s;
+};
+
 struct Fix
 {
-
-    std::vector< double > u = std::vector< double >(100000);
-    std::vector< double > n = std::vector< double >(100000);
+    std::vector< double > u         = std::vector< double >(100000);
+    std::vector< double > n         = std::vector< double >(100000);
+    std::vector< double > u_inf_nan = std::vector< double >(100000);
+    std::vector< Thing >  strct     = std::vector< Thing >(100000);
 
     Fix()
     {
@@ -29,22 +36,18 @@ struct Fix
         {
             std::ifstream stream(name, std::ios::in);
 
-            std::size_t i = 0;
-            // FIXME: this is wrong
-            while (std::getline(stream, line))
+            for (std::size_t i = 0; std::getline(stream, line); ++i)
             {
-                if(i > 100){
-                    break;
-                }
-                double f = 0;
-                s << line;
-                std::cout << s.str() << ", ";
-                s >> (*vec)[i++];
-                s>> f;
-                std::cout << (*vec)[i] << ", " << f << std::endl;
-                s.str() = "";
+                std::stringstream s(line);
+                s >> (*vec)[i];
+                strct[i].s = line;
+                strct[i].v = (*vec)[i];
             }
         }
+
+        u_inf_nan      = u;
+        u_inf_nan.push_back(std::numeric_limits< double >::quiet_NaN());
+        u_inf_nan.push_back(std::numeric_limits< double >::infinity());
     }
 
     ~Fix()          = default;
@@ -56,29 +59,38 @@ struct Fix
     operator=(Fix&&) = default;
 };
 
-BOOST_TEST_DECORATOR(*boost::unit_test::tolerance(2e-15));
+BOOST_TEST_DECORATOR(*boost::unit_test::tolerance(2e-14));
 BOOST_FIXTURE_TEST_CASE(sum_test, Fix)
 {
-    // numpy values
+    // numpy values for sum, obtained via partial summation algorithm
     // uniform: -44701.74983180444
     // normal: -53313.558700174326
-    Sum< double, NaNPolicy::propagate> sum;
 
+    Sum< double, NaNPolicy::propagate > sum_propagate;
+    Sum< double, NaNPolicy::skip >      sum_skip;
+    Sum< double, NaNPolicy::error >     sum_throw;
 
-    double s = sum(u.begin(), u.begin()+100);
-    BOOST_TEST(s == -44701.74983180444);
+    sum_propagate.reset();
+    BOOST_TEST(sum_propagate.result() == 0);
 
-    s = sum(u.begin(), u.end());
-    BOOST_TEST(s == 2 * -44701.74983180444);
+    // value based operator
+    for (auto&& it = u.begin(); it != u.end(); ++it)
+    {
+        sum_propagate(*it);
+    }
 
-    sum.reset();
+    BOOST_TEST(sum_propagate.result() == -44701.74983180444);
 
-    BOOST_TEST(sum.result() == 0.);
+    // partition sum
+    sum_propagate.reset();
+    sum_propagate(u.begin(), u.end());
+    BOOST_TEST(sum_propagate.result() == -44701.74983180444);
 
+    sum_propagate.reset();
+    sum_propagate(u_inf_nan.begin(), u_inf_nan.end());
+    BOOST_TEST(std::isnan(sum_propagate.result()));
 
-    // s = sum(n.begin(), n.end());
-    // BOOST_TEST(s == -53313.558700174326);
+    sum_skip(u.begin(), u.end());
+    BOOST_TEST(sum_skip.result() == -44701.74983180444);
 
-    // s = sum(n.begin(), n.end());
-    // BOOST_TEST(s == 2 * -53313.558700174326);
 }

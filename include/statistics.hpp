@@ -51,8 +51,9 @@ enum class NaNPolicy
  */
 template < NaNPolicy nan_p, typename T, typename U, typename Op >
 inline auto
-treat_nan(T&& t, U&& v, Op&& op)
-    -> std::enable_if_t< std::is_convertible< std::decay_t<T>, std::decay_t<U> >::value, T >
+treat_nan(T&& t, U&& v, Op&& op) -> std::enable_if_t<
+    std::is_convertible< std::decay_t< T >, std::decay_t< U > >::value,
+    std::decay_t< U > >
 {
     if constexpr (nan_p == NaNPolicy::propagate)
     {
@@ -118,46 +119,34 @@ class Sum final
         static_assert(std::is_convertible< U, T >::value,
                       "Error, type T in struct 'sum' not comptabile with type "
                       "'U' used by call operator");
-        _s += value;
+
+        _s = treat_nan< nan_p >(std::forward< U >(value), _s, std::plus< T >{});
         return _s;
     }
 
     template < typename InputIterator, typename Getter >
     inline constexpr T
-    operator()(InputIterator&& begin, InputIterator&& end, Getter&& getter)
+    operator()(InputIterator begin, InputIterator end, Getter&& getter)
     {
-
-        static_assert(
-            std::is_convertible< typename std::iterator_traits< std::decay_t<
-                                     InputIterator > >::value_type,
-                                 T >::value,
-            "Error, type T in struct 'sum' not comptabile with type "
-            "of iterator::value_type used by call operator");
-
         if (begin != end)
         {
             if (std::distance(begin, end) <= 1000)
             {
                 for (; begin != end; ++begin)
                 {
-                    // _s = treat_nan< nan_p >(getter(*begin), _s, std::plus<T>{});
-                    _s += getter(*begin);
+                    operator()(getter(*begin));
                 }
             }
             else
             {
                 std::size_t t =
-                    std::floor(double(std::distance(begin, end) / 2));
+                    std::floor(double(std::distance(begin, end)) / 2.);
 
                 this->operator()(
-                    std::forward< InputIterator >(begin),
-                    std::next(std::forward< InputIterator >(begin), t),
-                    std::forward< Getter >(getter));
+                    begin, std::next(begin, t), std::forward< Getter >(getter));
 
                 this->operator()(
-                    std::next(std::forward< InputIterator >(begin), t),
-                    std::forward< InputIterator >(end),
-                    std::forward< Getter >(getter));
+                    std::next(begin, t), end, std::forward< Getter >(getter));
             }
         }
         return _s;
@@ -165,18 +154,12 @@ class Sum final
 
     template < typename InputIterator >
     inline constexpr T
-    operator()(InputIterator&& begin, InputIterator&& end) noexcept
+    operator()(InputIterator begin, InputIterator end) noexcept
     {
-        static_assert(
-            std::is_convertible_v<
-                T,
-                typename std::iterator_traits< InputIterator >::value_type >);
-
         if (begin != end)
         {
-            _s = this->operator()(std::forward< InputIterator >(begin),
-                             std::forward< InputIterator >(end),
-                             [](auto&& value) { return value; });
+            _s = this->operator()(
+                begin, end, [](auto&& value) { return value; });
         }
         return _s;
     }

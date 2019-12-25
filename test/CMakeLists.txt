@@ -8,10 +8,18 @@ find_package(Boost COMPONENTS unit_test_framework REQUIRED)
 # add boost include directory to look for headers
 include_directories( ${Boost_INCLUDE_DIR} )
 
-# copy file to the test directory
-#configure_file(normal_0_1_data.csv ../test/normal_0_1_data.csv COPYONLY)
+set(CMAKE_CXX_STANDARD 17)
+
+# copy files to test dir 
+configure_file(normal.csv normal.csv COPYONLY)
+configure_file(uniform.csv uniform.csv COPYONLY)
+
+# add executable for the test
+add_executable(statistics_test statistics_test.cpp)
 
 # needed to use boost unit_test dynamic library to generate main function
-# for tests. FIXME: Problematic upon compiler switches!
-add_definitions(-DBOOST_TEST_DYN_LINK) 
-add_boost_test(statistics_test.cpp StatLab)
+# for tests.
+# add_definitions(-DBOOST_TEST_DYN_LINK) 
+add_test(statistics_test statistics_test)
+
+

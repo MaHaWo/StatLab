@@ -1,12 +1,12 @@
-# ignore everything
+# Ignore everything
 *
 
-# but allow subfolder descent
-!*/**
+# But allow descend into directories
+!*/
 
 # unignore stuff we want to keep
 !.gitignore
-!*/**/*.txt
+!*/**/CMakeLists.txt
 !*/**/*.cc
 !*/**/*.hh
 !*/**/*.hpp

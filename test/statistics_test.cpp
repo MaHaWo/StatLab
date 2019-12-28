@@ -1,3 +1,4 @@
+#include <stdexcept>
 #define BOOST_TEST_MODULE UNARY_TESTS
 #include <boost/test/included/unit_test.hpp>
 #include <sstream>
@@ -93,4 +94,10 @@ BOOST_FIXTURE_TEST_CASE(sum_test, Fix)
     sum_skip(u.begin(), u.end());
     BOOST_TEST(sum_skip.result() == -44701.74983180444);
 
+    try{
+        sum_throw(u_inf_nan.begin(), u_inf_nan.end());
+    }
+    catch(std::exception& e){
+        BOOST_TEST(e.what() == "Error, nan or inf found: nan");
+    }
 }

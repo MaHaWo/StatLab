@@ -106,8 +106,10 @@ BOOST_FIXTURE_TEST_CASE(sum_test, Fix)
     BOOST_CHECK_EXCEPTION(sum_throw(u_inf_nan.begin(), u_inf_nan.end()),
                           std::exception,
                           [](const std::exception& e) -> bool {
-                              return e.what() ==
-                                     "Error: invalid value found in sum : nan"s;
+                              BOOST_CHECK_EQUAL(
+                                  e.what(),
+                                  "Error: invalid value found in sum: nan"s);
+                              return true;
                           });
 
     sum_propagate.reset();
@@ -117,7 +119,7 @@ BOOST_FIXTURE_TEST_CASE(sum_test, Fix)
     BOOST_TEST(sum_propagate.result() == 3 * -44701.74983180444);
 }
 
-BOOST_TEST_DECORATOR(*boost::unit_test::tolerance(2e-14));
+BOOST_TEST_DECORATOR(*boost::unit_test::tolerance(2e-15));
 BOOST_FIXTURE_TEST_CASE(sum_kahan_test, Fix)
 {
     // numpy values for sum, obtained via partial summation algorithm

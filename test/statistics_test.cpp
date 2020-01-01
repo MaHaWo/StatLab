@@ -1,17 +1,19 @@
-#include <stdexcept>
+
 #define BOOST_TEST_MODULE UNARY_TESTS
 #include <boost/test/included/unit_test.hpp>
-#include <sstream>
 
-#include "../include/statistics.hpp"
-
+#include <exception>
 #include <fstream>
 #include <random>
+#include <sstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
+#include "../include/statistics.hpp"
+
 using namespace Statistics;
-using namespace std::literals::chrono_literals;
+using namespace std::literals;
 
 struct Thing
 {
@@ -46,7 +48,7 @@ struct Fix
             }
         }
 
-        u_inf_nan      = u;
+        u_inf_nan = u;
         u_inf_nan.push_back(std::numeric_limits< double >::quiet_NaN());
         u_inf_nan.push_back(std::numeric_limits< double >::infinity());
     }
@@ -87,6 +89,9 @@ BOOST_FIXTURE_TEST_CASE(sum_test, Fix)
     sum_propagate(u.begin(), u.end());
     BOOST_TEST(sum_propagate.result() == -44701.74983180444);
 
+    sum_propagate(u_inf_nan.begin(), u_inf_nan.end());
+    BOOST_TEST(std::isnan(sum_propagate.result()));
+
     sum_propagate.reset();
     sum_propagate(u_inf_nan.begin(), u_inf_nan.end());
     BOOST_TEST(std::isnan(sum_propagate.result()));
@@ -94,12 +99,22 @@ BOOST_FIXTURE_TEST_CASE(sum_test, Fix)
     sum_skip(u.begin(), u.end());
     BOOST_TEST(sum_skip.result() == -44701.74983180444);
 
-    try{
-        sum_throw(u_inf_nan.begin(), u_inf_nan.end());
-    }
-    catch(std::invalid_argument& e){
-        BOOST_TEST(e.what() == "std::invalid_argument: Error, nan or inf found: nan");
-    }
+    sum_skip.reset();
+    sum_skip(u_inf_nan.begin(), u_inf_nan.end());
+    BOOST_TEST(sum_skip.result() == -44701.74983180444);
+
+    BOOST_CHECK_EXCEPTION(sum_throw(u_inf_nan.begin(), u_inf_nan.end()),
+                          std::exception,
+                          [](const std::exception& e) -> bool {
+                              return e.what() ==
+                                     "Error: invalid value found in sum : nan"s;
+                          });
+
+    sum_propagate.reset();
+    sum_propagate(u.begin(), u.end());
+    sum_propagate(u.begin(), u.end());
+    sum_propagate(u.begin(), u.end());
+    BOOST_TEST(sum_propagate.result() == 3 * -44701.74983180444);
 }
 
 BOOST_TEST_DECORATOR(*boost::unit_test::tolerance(2e-14));
@@ -123,7 +138,7 @@ BOOST_FIXTURE_TEST_CASE(sum_kahan_test, Fix)
     }
 
     BOOST_TEST(sum_propagate.result() == -44701.74983180444);
-    
+
     sum_propagate.reset();
     BOOST_TEST(sum_propagate.result() == 0);
 }

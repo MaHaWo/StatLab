@@ -136,7 +136,7 @@ class Sum final
 
     template < typename InputIterator >
     inline constexpr T
-    operator()(InputIterator begin, InputIterator end) noexcept
+    operator()(InputIterator begin, InputIterator end)
     {
         if (begin != end)
         {
@@ -192,7 +192,7 @@ class SumKahan final
 
     template < typename InputIterator, typename Getter >
     inline constexpr T
-    operator()(InputIterator begin, InputIterator end, Getter&& getter) noexcept
+    operator()(InputIterator begin, InputIterator end, Getter&& getter)
     {
         if (begin != end)
         {
@@ -207,7 +207,7 @@ class SumKahan final
 
     template < typename InputIterator >
     inline constexpr T
-    operator()(InputIterator begin, InputIterator end) noexcept
+    operator()(InputIterator begin, InputIterator end)
     {
         static_assert(std::is_convertible_v<
                       T,
@@ -218,7 +218,7 @@ class SumKahan final
 
     template < typename U >
     inline constexpr T
-    operator()(U&& value) noexcept
+    operator()(U&& value)
     {
         static_assert(std::is_convertible_v< T, std::decay_t< U > >);
 

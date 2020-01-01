@@ -15,6 +15,7 @@
 #include <cmath>
 #include <numeric>
 #include <type_traits>
+#include <unistd.h>
 #include <unordered_map>
 
 using namespace Statistics::Utils;
@@ -35,57 +36,6 @@ enum class NaNPolicy
     error
 };
 
-/**
- * @brief function that implements the treatment of not-a-number and infinities
- *
- * @tparam T automatically determined
- * @tparam Op automatically determined
- * @tparam nan_p nan_policy indicator of type NanPolicy. can be
- *         NaNPolicy::propagate
- *         NaNPolicy::skip
- *         NaNPolicy::error
- * @param t current value
- * @param v target value
- * @param op operator function (often arithmetic) that maps (v, t) -> v
- * @return T result of op(v,t);
- */
-template < NaNPolicy nan_p, typename T, typename U, typename Op >
-inline auto
-treat_nan(T&&                t,
-          U&&                v,
-          Op&&               op,
-          decltype(op(t, v)) neutral = decltype(op(t, v)){})
-    -> decltype(op(t, v))
-{
-    if constexpr (nan_p == NaNPolicy::propagate)
-    {
-        return op(std::forward< T >(t), std::forward< T >(v));
-    }
-    else if constexpr (nan_p == NaNPolicy::skip)
-    {
-        if (not(std::isnan(std::forward< T >(t)) or
-                std::isinf(std::forward< T >(t))))
-        {
-            return op(std::forward< T >(t), std::forward< T >(v));
-        }
-        else
-        {
-            // FIXME: this is dangereous because it does not ignore stuff as it
-            // should
-            return neutral;
-        }
-    }
-    else
-    { // nan_p == NaNPolicy::error
-        if (std::isnan(std::forward< T >(t)) or
-            std::isinf(std::forward< T >(t)))
-        {
-            throw std::invalid_argument("Error, nan or inf found: " +
-                                        std::to_string(t));
-        }
-        return op(std::forward< T >(t), std::forward< T >(v));
-    }
-}
 
 template < typename T, NaNPolicy nan_p = NaNPolicy::propagate >
 class Sum final
@@ -128,7 +78,31 @@ class Sum final
                       "Error, type T in struct 'sum' not comptabile with type "
                       "'U' used by call operator");
 
-        _s = treat_nan< nan_p >(std::forward< U >(value), _s, std::plus< T >{});
+        if constexpr (nan_p == NaNPolicy::propagate)
+        {
+            _s += value;
+        }
+        else if constexpr (nan_p == NaNPolicy::skip)
+        {
+            if (not std::isnan(value) and not std::isinf(value))
+            {
+                _s += value;
+            }
+        }
+        else
+        {
+            if (not std::isnan(value) and not std::isinf(value))
+            {
+                _s += value;
+            }
+            else
+            {
+                throw std::invalid_argument(
+                    "Error: invalid value found in sum: " +
+                    std::to_string(value));
+            }
+        }
+
         return _s;
     }
 
@@ -166,8 +140,7 @@ class Sum final
     {
         if (begin != end)
         {
-            _s = this->operator()(
-                begin, end, [](auto&& value) { return value; });
+            this->operator()(begin, end, [](auto&& value) { return value; });
         }
         return _s;
     }
@@ -247,11 +220,39 @@ class SumKahan final
     inline constexpr T
     operator()(U&& value) noexcept
     {
-        static_assert(std::is_convertible_v< T, std::decay_t<U> >);
+        static_assert(std::is_convertible_v< T, std::decay_t< U > >);
 
-        _y = value - _comp;
-        _t = treat_nan<nan_p>(_s, _y, std::plus<>{});
-        _s = _t;
+        if constexpr (nan_p == NaNPolicy::propagate)
+        {
+            _y = value - _comp;
+            _t = _s + _y;
+            _s = _t;
+        }
+        else if constexpr (nan_p == NaNPolicy::skip)
+        {
+            if (not std::isnan(value) and not std::isinf(value))
+            {
+                _y = value - _comp;
+                _t = _s + _y;
+                _s = _t;
+            }
+        }
+        else
+        {
+            if (not std::isnan(value) and not std::isinf(value))
+            {
+                _y = value - _comp;
+                _t = _s + _y;
+                _s = _t;
+            }
+            else
+            {
+                throw std::invalid_argument(
+                    "Error: invalid value found in sum: " +
+                    std::to_string(value));
+            }
+        }
+
         return _s;
     }
 };

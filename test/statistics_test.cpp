@@ -97,7 +97,33 @@ BOOST_FIXTURE_TEST_CASE(sum_test, Fix)
     try{
         sum_throw(u_inf_nan.begin(), u_inf_nan.end());
     }
-    catch(std::exception& e){
-        BOOST_TEST(e.what() == "Error, nan or inf found: nan");
+    catch(std::invalid_argument& e){
+        BOOST_TEST(e.what() == "std::invalid_argument: Error, nan or inf found: nan");
     }
+}
+
+BOOST_TEST_DECORATOR(*boost::unit_test::tolerance(2e-14));
+BOOST_FIXTURE_TEST_CASE(sum_kahan_test, Fix)
+{
+    // numpy values for sum, obtained via partial summation algorithm
+    // uniform: -44701.74983180444
+    // normal: -53313.558700174326
+
+    SumKahan< double, NaNPolicy::propagate > sum_propagate;
+    SumKahan< double, NaNPolicy::skip >      sum_skip;
+    SumKahan< double, NaNPolicy::error >     sum_throw;
+
+    sum_propagate.reset();
+    BOOST_TEST(sum_propagate.result() == 0);
+
+    // value based operator
+    for (auto&& it = u.begin(); it != u.end(); ++it)
+    {
+        sum_propagate(*it);
+    }
+
+    BOOST_TEST(sum_propagate.result() == -44701.74983180444);
+    
+    sum_propagate.reset();
+    BOOST_TEST(sum_propagate.result() == 0);
 }

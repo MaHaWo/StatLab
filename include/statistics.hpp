@@ -51,9 +51,11 @@ enum class NaNPolicy
  */
 template < NaNPolicy nan_p, typename T, typename U, typename Op >
 inline auto
-treat_nan(T&& t, U&& v, Op&& op) -> std::enable_if_t<
-    std::is_convertible< std::decay_t< T >, std::decay_t< U > >::value,
-    std::decay_t< U > >
+treat_nan(T&&                t,
+          U&&                v,
+          Op&&               op,
+          decltype(op(t, v)) neutral = decltype(op(t, v)){})
+    -> decltype(op(t, v))
 {
     if constexpr (nan_p == NaNPolicy::propagate)
     {
@@ -65,6 +67,12 @@ treat_nan(T&& t, U&& v, Op&& op) -> std::enable_if_t<
                 std::isinf(std::forward< T >(t))))
         {
             return op(std::forward< T >(t), std::forward< T >(v));
+        }
+        else
+        {
+            // FIXME: this is dangereous because it does not ignore stuff as it
+            // should
+            return neutral;
         }
     }
     else
@@ -165,7 +173,7 @@ class Sum final
     }
 };
 
-template < typename T >
+template < typename T, NaNPolicy nan_p = NaNPolicy::propagate >
 class SumKahan final
 {
   private:
@@ -211,23 +219,14 @@ class SumKahan final
 
     template < typename InputIterator, typename Getter >
     inline constexpr T
-    operator()(InputIterator&& begin,
-               InputIterator&& end,
-               Getter&&        getter) noexcept
+    operator()(InputIterator begin, InputIterator end, Getter&& getter) noexcept
     {
-        static_assert(std::is_convertible_v<
-                      T,
-                      std::iterator_traits< InputIterator >::value_type >);
-
         if (begin != end)
         {
             _comp = 0.;
             for (; begin != end; ++begin)
             {
-                _y    = getter(*begin) - _comp;
-                _t    = _s + _y;
-                _comp = (_t - _s) - _y;
-                _s    = _t;
+                operator()(getter(*begin));
             }
         }
         return _s;
@@ -235,25 +234,23 @@ class SumKahan final
 
     template < typename InputIterator >
     inline constexpr T
-    operator()(InputIterator&& begin, InputIterator&& end) noexcept
+    operator()(InputIterator begin, InputIterator end) noexcept
     {
         static_assert(std::is_convertible_v<
                       T,
                       std::iterator_traits< InputIterator >::value_type >);
 
-        return this->operator()(std::forward< InputIterator >(begin),
-                                std::forward< InputIterator >(end),
-                                [](auto&& value) { return value; });
+        return this->operator()(begin, end, [](auto&& value) { return value; });
     }
 
     template < typename U >
     inline constexpr T
     operator()(U&& value) noexcept
     {
-        static_assert(std::is_convertible_v< T, U >);
+        static_assert(std::is_convertible_v< T, std::decay_t<U> >);
 
-        _y = std::forward< U >(value) - _comp;
-        _t = _s + _y;
+        _y = value - _comp;
+        _t = treat_nan<nan_p>(_s, _y, std::plus<>{});
         _s = _t;
         return _s;
     }

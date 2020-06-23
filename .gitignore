@@ -1,10 +1,25 @@
-# ignore everything
+# Ignore everything
 *
 
-# unignore stuff we want to keep
-!.gitignore
-!*/*.txt
-!*/*.cc
-!*/*.hh
-!*/*.py
-!*/*.csv
+# But allow descend into directories
+!*/
+
+# But ignore all build dirs
+C_CPP/**/build/*
+
+# now unignore the desired extensions
+!/**/*.hh
+!/**/*.hpp
+!/**/*.h
+!/**/*.cc
+!/**/*.cpp
+!/**/*.c
+!/**/*.py
+!/**/*.txt
+!/**/*.md
+!/**/*.csv
+
+
+# but ignore some things not needed 
+
+/**/*/CMakeCache.txt

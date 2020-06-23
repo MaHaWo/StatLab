@@ -23,3 +23,5 @@ C_CPP/**/build/*
 # but ignore some things not needed 
 
 /**/*/CMakeCache.txt
+.clang-format
+.clang-tidy

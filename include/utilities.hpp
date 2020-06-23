@@ -7,6 +7,7 @@
 
 namespace StatLab {
 namespace Utils {
+// FIXME: use c++20 concepts here
 
 /**
  * @brief Determine if a type T has a multiplicative inverse

@@ -1,689 +1,945 @@
-#ifndef STATLAB_CORE_HPP
-#define STATLAB_CORE_HPP
+/** @file statistics.hh
+ *  @brief Implements functions for computing statistics.
+ *
+ *  @bug Quantiles return only exact quantiles, that is only
+ *       values which are contained in the container.
+ *  @todo Optimize, perhaps use template metaprogramming where appropriate
+ *  @todo Implement interpolation for quantiles, since they are defined such
+ *
+ */
+#ifndef UTOPIA_MODELS_AMEEMULTI_STATISTICS_HH
+#define UTOPIA_MODELS_AMEEMULTI_STATISTICS_HH
 
-#include "utilities.hpp"
+#include "utils.hpp"
+#include <algorithm>
+#include <cmath>
+#include <numeric>
+#include <type_traits>
+#include <unistd.h>
+#include <unordered_map>
 
-namespace StatLab
+using namespace Statistics::Utils;
+
+namespace Statistics
 {
 
 /**
- * @brief TODO
- *
- * @tparam T
+ * @brief Indicate how NaN or Inf shall be treated:
+ *  - propagate: default, this propagates nan or inf to the result
+ *  - skip: skip them
+ *  - error: throw invalid_agument exception when nan or inf is encountered
  */
-template < typename T >
-class Product final
+enum class NaNPolicy
 {
-    T _result;
-
-  public:
-    /**
-     * @brief TODO
-     *
-     * @param value
-     * @return T
-     */
-    inline auto
-    operator()(T value) -> T
-    {
-        _result *= T;
-        return _result;
-    }
-
-    /**
-     * @brief TODO
-     *
-     * @tparam Iter
-     * @tparam Getter
-     * @param begin
-     * @param end
-     * @param getter
-     * @return auto
-     */
-    template < typename Iter, typename Getter >
-    inline auto
-    operator()(Iter&& begin, Iter&& end, Getter&& getter)
-    {
-        std::for_each(std::forward< Iter >(begin),
-                      std::forward< Iter >(end),
-                      [&getter, &_result](auto&& v) { _result *= v; });
-
-        return _result;
-    }
-
-    /**
-     * @brief Construct a new Product object
-     *
-     */
-    Product() : _result(T{})
-    {
-    }
-
-    /**
-     * @brief Construct a new Product object
-     *
-     */
-    Product(const Product&) = default;
-
-    /**
-     * @brief Construct a new Product object
-     *
-     */
-    Product(Product&&) = default;
-
-    /**
-     * @brief Assign Product object
-     *
-     * @return Product&
-     */
-    Product&
-    operator=(const Product&) = default;
-
-    /**
-     * @brief Assign Product object
-     *
-     * @return Product&
-     */
-    Product&
-    operator=(Product&&) = default;
-
-    /**
-     * @brief Destroy the Product object
-     *
-     */
-    ~Product();
+    propagate,
+    skip,
+    error
 };
 
-/**
- * @brief Sum up a range of (real) numbers using the kahan summation algorithm
- * to limit the accumulation of summation error:
- * https://en.wikipedia.org/wiki/Kahan_summation_algorithm
- *
- * @tparam T
- */
-template < typename T >
-class SumKahan final
+
+template < typename T, NaNPolicy nan_p = NaNPolicy::propagate >
+class Sum final
 {
-    T _result;
-    T _comp;
-    T _y;
-    T _t;
+  private:
+    T _s;
 
   public:
-    // rule of five + custom constructor
-    SumKahan() : _result(T{}), _comp(T{}), _y(T{}), _t(T{})
+    template < class U >
+    Sum(U&& v) noexcept : _s(std::forward< U >(v))
     {
     }
-    SumKahan(const SumKahan&) = default;
-    SumKahan(SumKahan&&)      = default;
-    SumKahan&
-    operator=(const SumKahan&) = default;
-    SumKahan&
-    operator=(SumKahan&&) = default;
-    ~SumKahan()           = default;
 
-    /**
-     * @brief TODO
-     *
-     * @return T
-     */
-    inline constexpr T
-    result()
-    {
-        return _result;
-    }
+    Sum() noexcept                 = default;
+    Sum(const Sum& other) noexcept = default;
+    Sum(Sum&& other) noexcept      = default;
+    Sum&
+    operator=(const Sum& other) noexcept = default;
+    Sum&
+    operator=(Sum&& other) noexcept = default;
+    ~Sum() noexcept                 = default;
 
-    /**
-     * @brief Reset internal variable to zero or equivalent for type T
-     *
-     */
     inline constexpr void
-    reset()
+    reset() noexcept
     {
-        _result = T{};
+        _s = T{};
     }
 
-    /**
-     * @brief TODO
-     *
-     * @tparam BinaryFunc
-     * @param value
-     * @param plus
-     * @param Minus
-     * @return T
-     */
-    template < typename BinaryFunc >
-    inline constexpr auto
-    operator()(T value, BinaryFunc&& plus) -> T
+    inline constexpr T
+    result() noexcept
     {
-        _y      = plus(value, -1 * _comp);
-        _t      = plus(_result, _y);
-        _comp   = plus(plus(_t, -1 * _result), -1 * _y);
-        _result = _t;
-        return _result;
+        return _s;
     }
 
-    /**
-     * @brief
-     *
-     * @param value
-     * @return T
-     */
-    inline constexpr auto
-    operator()(T value) -> T
+    template < typename U >
+    inline constexpr T
+    operator()(U&& value)
     {
-        return operator()(value, std::plus<>{});
-    }
+        static_assert(std::is_convertible< U, T >::value,
+                      "Error, type T in struct 'sum' not comptabile with type "
+                      "'U' used by call operator");
 
-    /**
-     * @brief TODO
-     *
-     * @tparam Iter
-     * @tparam Getter
-     * @param begin
-     * @param end
-     * @param getter
-     * @return Utils::requires<Utils::is_addable, T>
-     */
-    template < typename Iter, typename Getter, typename BinaryFunc >
-    inline auto
-    operator()(Iter&& begin, Iter&& end, Getter&& getter, BinaryFunc&& plus)
-        -> T
-    {
-        for (; begin != end; ++begin)
+        if constexpr (nan_p == NaNPolicy::propagate)
         {
-            this->operator()(getter(*begin), std::forward< BinaryFunc >(plus));
+            _s += value;
         }
-        return _result;
-    }
-
-    /**
-     * @brief TODO
-     *
-     * @tparam Iter
-     * @tparam Getter
-     * @param begin
-     * @param end
-     * @param getter
-     * @return auto
-     */
-    template < typename Iter, typename Getter >
-    inline auto
-    operator()(Iter&& begin, Iter&& end, Getter&& getter) -> T
-    {
-        return operator()(std::forward< Iter >(begin),
-                          std::forward< Iter >(end),
-                          std::forward< Getter >(getter),
-                          std::plus<>{});
-    }
-
-    /**
-     * @brief
-     *
-     * @tparam Iter
-     * @param begin
-     * @param end
-     * @return auto
-     */
-    template < typename Iter >
-    inline auto
-    operator()(Iter&& begin, Iter&& end) -> T
-    {
-        return operator()(std::forward< Iter >(begin),
-                          std::forward< Iter >(end),
-                          Utils::Identity< T >{});
-    }
-};
-
-/**
- * @brief Sum a range of numbers using pairwise summation algorithm
- *
- * @tparam T
- */
-template < typename T >
-class SumPairwise final
-{
-    T _result;
-
-  public:
-    // rule of file
-    SumPairwise() : _result(T{})
-    {
-    }
-    SumPairwise(const SumPairwise&) = default;
-    SumPairwise(SumPairwise&&)      = default;
-    SumPairwise&
-    operator=(const SumPairwise&) = default;
-    SumPairwise&
-    operator=(SumPairwise&&) = default;
-    ~SumPairwise()           = default;
-
-    /**
-     * @brief TODO
-     *
-     * @return T
-     */
-    inline constexpr T
-    result()
-    {
-        return _result;
-    }
-
-    /**
-     * @brief Reset the internal variables to zero or equivalent for type T
-     *
-     */
-    inline constexpr void
-    reset()
-    {
-        _result = T{};
-    }
-
-    /**
-     * @brief Add a number 'value' of type T to the value stored in the caller
-     *
-     * @param value value to add
-     * @return constexpr T
-     */
-    template < typename BinaryFunc >
-    inline constexpr auto
-    operator()(T value, BinaryFunc&& plus) -> T
-    {
-        _result = plus(_result, value);
-        return _result;
-    }
-
-    /**
-     * @brief TODO
-     *
-     * @param value
-     * @return T
-     */
-    inline constexpr auto
-    operator()(T value) -> T
-    {
-        return operator()(value, std::plus<>{});
-    }
-
-    /**
-     * @brief Add a range [begin, end) of values to the value stored by the
-     * caller. The range is represented by Iterators begin and end, and the
-     * values to add are the result of applying the callable 'getter' to the
-     * result of dereferencing each iterator.
-     * Uses partition sum to limit numerical errors.
-     * @tparam Iter Iterator type
-     * @tparam Getter Callable type to use
-     * @tparam base base size of range which tells the partition summation at
-     * which range size to evaluate the sum. If the range is longer than base,
-     *         recursion will be used with subranges until these are smaller or
-     * equal to base.
-     * @param begin Iterator to begin of range
-     * @param end Iterator to end of range
-     * @param getter Callable which is invoked on each result of dereferncing an
-     * iterator
-     * @param plus Function for adding two objects of type T
-     * @return T sum over the range, with each element being passed through
-     * 'getter' first.
-     */
-    template < typename Iter,
-               typename Getter,
-               typename BinaryFunc,
-               std::size_t base = 1000 >
-    inline auto
-    operator()(Iter&& begin, Iter&& end, Getter&& getter, BinaryFunc&& plus)
-        -> T
-    {
-
-        using IVT =
-            typename std::iterator_traits< std::decay_t< Iter > >::value_type;
-
-        // check that the getter is usefully invocable
-        static_assert(
-            std::is_invocable_v< std::decay_t< Getter >, IVT >,
-            "Error, Getter cannot be invoked with to value type of iterator");
-
-        double result = 0;
-        double size   = std::distance(begin, end);
-        // use partition sum to limit numerical errors
-        if (size <= base)
+        else if constexpr (nan_p == NaNPolicy::skip)
         {
-            // recursion base case
-            for (; begin != end; ++begin)
+            if (not std::isnan(value) and not std::isinf(value))
             {
-                _result = plus(_result, getter(*begin));
+                _s += value;
             }
         }
         else
         {
-
-            std::size_t half = std::round(size / 2.);
-
-            // recursion
-            this->operator()(std::next(std::forward< Iter >(begin), half),
-                             std::forward< Iter >(end),
-                             std::forward< Getter >(getter),
-                             std::forward< BinaryFunc >(plus));
-
-            this->operator()(std::forward< Iter >(begin),
-                             std::next(std::forward< Iter >(begin), half),
-                             std::forward< Getter >(getter),
-                             std::forward< BinaryFunc >(plus));
+            if (not std::isnan(value) and not std::isinf(value))
+            {
+                _s += value;
+            }
+            else
+            {
+                throw std::invalid_argument(
+                    "Error: invalid value found in sum: " +
+                    std::to_string(value));
+            }
         }
 
-        return _result;
+        return _s;
     }
 
-    /**
-     * @brief TODO
-     *
-     * @tparam Iter
-     * @tparam Getter
-     * @param begin
-     * @param end
-     * @param getter
-     * @return T
-     */
-    template < typename Iter, typename Getter >
-    inline auto
-    operator()(Iter&& begin, Iter&& end, Getter&& getter) -> T
-    {
-        return operator()(std::forward< Iter >(begin),
-                          std::forward< Iter >(end),
-                          std::forward< Getter >(getter),
-                          std::plus<>{});
-    }
-
-    /**
-     * @brief TODO
-     *
-     * @tparam Iter
-     * @param begin
-     * @param end
-     * @return auto
-     */
-    template < typename Iter >
-    inline auto
-    operator()(Iter&& begin, Iter&& end)
-    {
-        return operator()(std::forward< Iter >(begin),
-                          std::forward< Iter >(end),
-                          Utils::Identity< T >{});
-    }
-};
-
-//==============================================================================
-//==============================================================================
-//============================ Sum based statistics ============================
-//==============================================================================
-//==============================================================================
-
-/**
- * @brief TODO
- *
- * @tparam T
- * @tparam SumAlgorithm
- * @tparam order
- */
-template < typename T,
-           template < typename >
-           class SumAlgorithm,
-           std::size_t order >
-class Moment
-{
-    SumAlgorithm< T > _accumulator;
-    T                 _size;
-
-  public:
-    Moment() : _accumulator(SumAlgorithm< T >{}), _size(T{})
-    {
-    }
-    Moment(const Moment&) = default;
-    Moment(Moment&&)      = default;
-    Moment&
-    operator=(const Moment&) = default;
-    Moment&
-    operator=(Moment&&) = default;
-    ~Moment()           = default;
-
-    /**
-     * @brief Return the result stored in the functor.
-     *
-     * @return T
-     */
+    template < typename InputIterator, typename Getter >
     inline constexpr T
-    result()
+    operator()(InputIterator begin, InputIterator end, Getter&& getter)
     {
-        return _accumulator.result() / _size;
+        if (begin != end)
+        {
+            if (std::distance(begin, end) <= 1000)
+            {
+                for (; begin != end; ++begin)
+                {
+                    operator()(getter(*begin));
+                }
+            }
+            else
+            {
+                std::size_t t =
+                    std::floor(double(std::distance(begin, end)) / 2.);
+
+                this->operator()(
+                    begin, std::next(begin, t), std::forward< Getter >(getter));
+
+                this->operator()(
+                    std::next(begin, t), end, std::forward< Getter >(getter));
+            }
+        }
+        return _s;
     }
 
-    /**
-     * @brief reset the functor, setting its internally stored sum value to zero
-     *
-     */
+    template < typename InputIterator >
+    inline constexpr T
+    operator()(InputIterator begin, InputIterator end)
+    {
+        if (begin != end)
+        {
+            this->operator()(begin, end, [](auto&& value) { return value; });
+        }
+        return _s;
+    }
+};
+
+template < typename T, NaNPolicy nan_p = NaNPolicy::propagate >
+class SumKahan final
+{
+  private:
+    T _y;
+    T _t;
+    T _s;
+    T _comp;
+
+  public:
+    template < class U >
+    SumKahan(U&& v) noexcept : _s(std::forward< U >(v))
+    {
+    }
+
+    SumKahan() noexcept = default;
+
+    SumKahan(const SumKahan& other) noexcept = default;
+
+    SumKahan(SumKahan&& other) noexcept = default;
+
+    SumKahan&
+    operator=(const SumKahan& other) noexcept = default;
+
+    SumKahan&
+    operator=(SumKahan&& other) noexcept = default;
+
+    ~SumKahan() noexcept = default;
+
     inline constexpr void
-    reset()
+    reset() noexcept
     {
-        _accumulator.reset();
-        _size = 0;
+        _s    = T{};
+        _y    = T{};
+        _t    = T{};
+        _comp = T{};
     }
 
-    /**
-     * @brief Add a single value to the sum stored within this functor
-     *
-     * @param value Value to add
-     * @return current summed value stored within this functor
-     */
-    inline constexpr auto
-    operator()(T value) -> T
+    inline constexpr T
+    result() noexcept
     {
-        _size += 1;
-        _accumulator(std::pow(value, order));
-        return _accumulator.result() / _size;
+        return _s;
     }
 
-    /**
-     * @brief TODO
-     *
-     * @tparam Iter
-     * @tparam Getter
-     * @tparam BinaryFunc1
-     * @tparam BinaryFunc2
-     * @param begin
-     * @param end
-     * @param getter
-     * @param plus
-     * @return T
-     */
-    template < typename Iter, typename Getter, typename BinaryFunc >
-    inline auto
-    operator()(Iter&& begin, Iter&& end, Getter&& getter, BinaryFunc&& plus)
-        -> T
+    template < typename InputIterator, typename Getter >
+    inline constexpr T
+    operator()(InputIterator begin, InputIterator end, Getter&& getter)
     {
-        _size += std::distance(std::forward< Iter >(begin),
-                               std::forward< Iter >(end));
-
-        return _accumulator(
-                   std::forward< Iter >(begin),
-                   std::forward< Iter >(end),
-                   [getter](auto&& v) { return std::pow(getter(v), order); },
-                   std::forward< BinaryFunc >(plus)) /
-               _size;
+        if (begin != end)
+        {
+            _comp = 0.;
+            for (; begin != end; ++begin)
+            {
+                operator()(getter(*begin));
+            }
+        }
+        return _s;
     }
 
-    /**
-     * @brief TODO
-     *
-     * @tparam Iter
-     * @tparam Getter
-     * @param begin
-     * @param end
-     * @param getter
-     * @return auto
-     */
-    template < typename Iter, typename Getter >
-    inline auto
-    operator()(Iter&& begin, Iter&& end, Getter&& getter) -> T
+    template < typename InputIterator >
+    inline constexpr T
+    operator()(InputIterator begin, InputIterator end)
     {
-        return operator()(std::forward< Iter >(begin),
-                          std::forward< Iter >(end),
-                          std::forward< Getter >(getter),
-                          std::plus<>{});
+        static_assert(std::is_convertible_v<
+                      T,
+                      std::iterator_traits< InputIterator >::value_type >);
+
+        return this->operator()(begin, end, [](auto&& value) { return value; });
     }
 
-    /**
-     * @brief
-     *
-     * @tparam Iter
-     * @param begin
-     * @param end
-     * @return auto
-     */
-    template < typename Iter >
-    inline auto
-    operator()(Iter&& begin, Iter&& end) -> T
+    template < typename U >
+    inline constexpr T
+    operator()(U&& value)
     {
-        return operator()(std::forward< Iter >(begin),
-                          std::forward< Iter >(end),
-                          Utils::Identity< T >{});
+        static_assert(std::is_convertible_v< T, std::decay_t< U > >);
+
+        if constexpr (nan_p == NaNPolicy::propagate)
+        {
+            _y = value - _comp;
+            _t = _s + _y;
+            _s = _t;
+        }
+        else if constexpr (nan_p == NaNPolicy::skip)
+        {
+            if (not std::isnan(value) and not std::isinf(value))
+            {
+                _y = value - _comp;
+                _t = _s + _y;
+                _s = _t;
+            }
+        }
+        else
+        {
+            if (not std::isnan(value) and not std::isinf(value))
+            {
+                _y = value - _comp;
+                _t = _s + _y;
+                _s = _t;
+            }
+            else
+            {
+                throw std::invalid_argument(
+                    "Error: invalid value found in sum: " +
+                    std::to_string(value));
+            }
+        }
+
+        return _s;
     }
 };
 
-/**
- * @brief TODO
- *
- * @tparam T
- * @tparam SumAlgorithm
- */
-template < typename T, template < typename > class SumAlgorithm >
-class ArithmeticMean final : public Moment< T, SumAlgorithm, 1 >
-{
-};
+// template < typename T, std::size_t Order >
+// class CentralMomentHelper final
+// {
+//     T           _m;
+//     std::size_t _size;
 
-/**
- * @brief TODO
- *
- * @tparam T
- * @tparam SumAlgorithm
- */
-template < typename T, template < typename > class SumAlgorithm >
-class HarmonicMean final
-{
-    Moment< T, SumAlgorithm, 1 > _moment;
+//   public:
+//     inline constexpr auto
+//     reset() noexcept -> void
+//     {
+//         _m = T{};
+//     }
 
-  public:
-    /**
-     * @brief TODO
-     *
-     * @tparam BinaryFunc
-     * @param value
-     * @param plus
-     * @return constexpr auto
-     */
-    template < typename BinaryFunc >
-    inline constexpr auto
-    operator()(T value, BinaryFunc&& plus)
-    {
-        _moment(static_cast< T >(1) / value, plus);
-        return static_cast< T >(1) / _moment.result();
-    }
+//     inline constexpr auto
+//     result() noexcept -> T
+//     {
+//         return _m;
+//     }
 
-    /**
-     * @brief TODO
-     *
-     * @tparam Iter
-     * @tparam Getter
-     * @tparam BinaryFunc
-     * @param begin
-     * @param end
-     * @param getter
-     * @param plus
-     * @return constexpr auto
-     */
-    template < typename Iter, typename Getter, typename BinaryFunc >
-    inline constexpr auto
-    operator()(Iter&& begin, Iter&& end, Getter&& getter, BinaryFunc&& plus)
-        -> T
-    {
-        return static_cast< T >(1) / _moment(
-                                         std::forward< Iter >(begin),
-                                         std::forward< Iter >(end),
-                                         [&getter](auto&& v) {
-                                             return static_cast< T >(1) /
-                                                    getter(v);
-                                         },
-                                         plus);
-    }
+//     template < typename U >
+//     inline constexpr std::enable_if_t< std::is_convertible_v< T, U >, T >
+//     operator()(U&& value) noexcept
+//     {
+//         static_assert(std::is_convertible_v< T, U >);
 
-    /**
-     * @brief TODO
-     *
-     * @tparam Iter
-     * @tparam Getter
-     * @param begin
-     * @param end
-     * @param getter
-     * @return T
-     */
-    template < typename Iter, typename Getter >
-    inline constexpr auto
-    operator()(Iter&& begin, Iter&& end, Getter&& getter) -> T
-    {
-        return operator()(std::forward< Iter >(begin),
-                          std::forward< Iter >(end),
-                          std::forward< Getter >(getter),
-                          std::plus<>{});
-    }
+//         // include  M formula here
+//         return _m;
+//     }
 
-    /**
-     * @brief TODO
-     *
-     * @tparam Iter
-     * @param begin
-     * @param end
-     * @return T
-     */
-    template < typename Iter >
-    inline constexpr auto
-    operator()(Iter&& begin, Iter&& end) -> T
-    {
-        return operator()(std::forward< Iter >(begin),
-                          std::forward< Iter >(end),
-                          Utils::Identity< T >{});
-    }
+//     template < typename InputIterator, typename Getter >
+//     inline constexpr T
+//     operator()(InputIterator&& begin,
+//                InputIterator&& end,
+//                Getter&&        getter) noexcept
+//     {
+//         static_assert(
+//             std::is_convertible_v<
+//                 T,
+//                 typename std::iterator_traits< InputIterator >::value_type
+//                 >);
 
-    HarmonicMean() : _moment(Moment< T, SumAlgorithm, 1 >{})
-    {
-    }
-    HarmonicMean(const HarmonicMean&) = default;
-    HarmonicMean(HarmonicMean&&)      = default;
-    HarmonicMean&
-    operator=(const HarmonicMean&) = default;
-    HarmonicMean&
-    operator=(HarmonicMean&&) = default;
-    ~HarmonicMean()           = default;
-};
+//         _size += std::distance(begin, end);
+//         std::for_each(begin,
+//                       end,
+//                       [this, g = std::forward< Getter >(getter)](auto&&
+//                       value) {
+//                           operator()(g(std::forward< decltype(value)
+//                           >(value)));
+//                       });
 
-/**
- * @brief
- *
- * @tparam T
- * @tparam SumAlgorithm
- */
-template < typename T >
-class GeometricMean final
-{
+//         return _m;
+//     }
 
-  public:
-    GeometricMean()                     = default;
-    GeometricMean(const GeometricMean&) = default;
-    GeometricMean(GeometricMean&&)      = default;
-    GeometricMean&
-    operator=(const GeometricMean&) = default;
-    GeometricMean&
-    operator=(GeometricMean&&) = default;
-    ~GeometricMean()           = default;
-};
+//     template < typename InputIterator >
+//     inline constexpr T
+//     operator()(InputIterator&& begin, InputIterator&& end) noexcept
+//     {
+//         static_assert(
+//             std::is_convertible_v<
+//                 T,
+//                 typename std::iterator_traits< InputIterator >::value_type
+//                 >);
 
-} // namespace StatLab
+//         return operator()(std::forward< InputIterator >(begin),
+//                           std::forward< InputIterator >(end),
+//                           [](auto&& v) { return v; });
+//     }
+// };
+
+// template < typename T, int order, template < typename... > class Sum >
+// class Moment
+// {
+//   protected:
+//     T        _size;
+//     Sum< T > _sum;
+
+//   public:
+//     inline T
+//     result()
+//     {
+//         return _sum.result() / _size;
+//     }
+
+//     inline void
+//     operator()(T value)
+//     {
+//         _size += 1;
+//         _sum(std::pow(value, order));
+//     }
+
+//     template < class InputIter, class Getter >
+//     T
+//     operator()(InputIter&& begin, InputIter&& end, Getter&& getter)
+//     {
+//         _size += std::distance(begin, end);
+//         _sum(std::forward< InputIter >(begin),
+//              std::forward< InputIter >(end),
+//              [&](auto&& value) { return std::pow(getter(value), order); });
+
+//         return result();
+//     }
+
+//     template < class InputIter >
+//     T
+//     operator()(InputIter&& begin, InputIter&& end)
+//     {
+//         return operator()(std::forward< InputIter >(begin),
+//                           std::forward< InputIter >(end),
+//                           [](auto&& v) { return v; });
+//     }
+
+//     Moment()                    = default;
+//     Moment(const Moment& other) = default;
+//     Moment(Moment&& other)      = default;
+//     Moment&
+//     operator=(Moment&& other) = default;
+//     Moment&
+//     operator=(const Moment& other) = default;
+//     virtual ~Moment()              = default;
+// };
+
+// /**
+//  * Functor for computing the arithmetic mean. using a given summation
+//  algorithm.
+//  * @tparam: T type to represent the mean value.
+//  * @tparam: Sum Functor implementing a summation algorithm.
+//  */
+// template < typename T, template < typename... > class Sum >
+// using ArithmeticMean = Moment< T, 1, Sum >;
+
+// template < typename T, template < typename... > class Sum >
+// class HarmonicMean
+// {
+//   protected:
+//     Sum< T > _mean;
+//     T        _size;
+
+//   public:
+//     void
+//     reset()
+//     {
+//         _mean.reset();
+//     }
+
+//     T
+//     result()
+//     {
+//         return _size / _mean.result();
+//     }
+
+//     T
+//     operator()(T value)
+//     {
+//         _size += 1;
+//         _mean(1. / value);
+//     }
+
+//     template < typename Iter, typename Getter >
+//     T
+//     operator()(Iter&& begin, Iter&& end, Getter&& getter)
+//     {
+//         _size += std::distance(std::forward< Iter >(begin),
+//                                std::forward< Iter >(end));
+//         std::for_each(std::forward< Iter >(begin),
+//                       std::forward< Iter >(end),
+//                       [&](auto&& value) { return 1. / getter(value); });
+
+//         return result();
+//     }
+
+//     template < typename Iter >
+//     T
+//     operator()(Iter&& begin, Iter&& end)
+//     {
+//         return operator()(std::forward< Iter >(begin),
+//                           std::forward< Iter >(end),
+//                           [](auto&& v) { return v; });
+//     }
+
+//     HarmonicMean()                          = default;
+//     HarmonicMean(const HarmonicMean& other) = default;
+//     HarmonicMean(HarmonicMean&& other)      = default;
+//     HarmonicMean&
+//     operator=(const HarmonicMean&& other) = default;
+//     HarmonicMean&
+//     operator=(HarmonicMean&& other) = default;
+//     virtual ~HarmonicMean()         = default;
+// };
+
+// template < typename T, template < typename... > class Sum >
+// class Variance
+// {
+//   protected:
+//     T        _n;
+//     Sum< T > _mean;
+//     T        _d;
+//     Sum< T > _M2;
+
+//   public:
+//     inline T
+//     result()
+//     {
+//         return _M2.result() / (_n - 1.);
+//     }
+
+//     inline void
+//     reset()
+//     {
+//         _n = 0;
+//         _mean.reset();
+//         _d = 0;
+//         _M2.reset();
+//     }
+
+//     inline void
+//     operator()(T value)
+//     {
+//         _n += 1;
+
+//         _d = value - _mean.result();
+//         _mean(_d / _n);
+//         _M2(_d * (value - _mean.result()));
+//     }
+
+//     template < typename InputIter, typename Getter >
+//     T
+//     operator()(InputIter&& begin, InputIter&& end, Getter&& getter)
+//     {
+//         std::for_each(std::forward< InputIter >(begin),
+//                       std::forward< InputIter >(end),
+//                       [&](auto&& value) { operator()(getter(value)); });
+//         return result();
+//     }
+
+//     template < typename InputIter >
+//     T
+//     operator()(InputIter&& begin, InputIter&& end)
+//     {
+//         return operator()(std::forward< InputIter >(begin),
+//                           std::forward< InputIter >(end),
+//                           [](auto&& v) { return v; });
+//     }
+
+//     Variance() : _n(0), _d(0), _mean(Sum< T >()), _M2(Sum< T >())
+//     {
+//     }
+//     Variance(const Variance& other) = default;
+//     Variance(Variance&& other)      = default;
+//     Variance&
+//     operator=(Variance&& other) = default;
+//     Variance&
+//     operator=(const Variance& other) = default;
+//     virtual ~Variance()              = default;
+// };
+
+// template < typename T, template < typename... > class Sum >
+// class Standarddeviation
+// {
+//   protected:
+//     Variance< T, Sum > _variance;
+
+//   public:
+//     T
+//     result()
+//     {
+//         return std::sqrt(_variance.result());
+//     }
+
+//     void
+//     reset()
+//     {
+//         _variance.reset();
+//     }
+
+//     void
+//     operator()(T value)
+//     {
+//         _variance(value);
+//     }
+
+//     template < typename InputIter, typename Getter >
+//     T
+//     operator()(InputIter&& begin, InputIter&& end, Getter&& getter)
+//     {
+//         return std::sqrt(_variance(std::forward< InputIter >(begin),
+//                                    std::forward< InputIter >(end),
+//                                    std::forward< Getter >(getter)));
+//     }
+
+//     template < typename InputIter >
+//     T
+//     operator()(InputIter&& begin, InputIter&& end)
+//     {
+//         return operator()(std::forward< InputIter >(begin),
+//                           std::forward< InputIter >(end),
+//                           [](auto&& v) { return v; });
+//     }
+
+//     Standarddeviation()
+//     {
+//     }
+//     Standarddeviation(const Standarddeviation& other) = default;
+//     Standarddeviation(Standarddeviation&& other)      = default;
+//     Standarddeviation&
+//     operator=(Standarddeviation&& other) = default;
+//     Standarddeviation&
+//     operator=(const Standarddeviation& other) = default;
+//     virtual ~Standarddeviation()              = default;
+// };
+
+// template < typename T, template < typename... > class Sum >
+// class Skewness
+// {
+//   protected:
+//     T        _n;
+//     Sum< T > _mean;
+//     Sum< T > _M2;
+//     Sum< T > _M3;
+//     T        _n1;
+//     T        _delta;
+//     T        _delta_n;
+//     T        _term1;
+
+//   public:
+//     inline void
+//     reset()
+//     {
+//         _n = 0;
+//         _mean.reset();
+//         _M2.reset();
+//         _M3.reset();
+//         _n1      = 0;
+//         _delta   = 0;
+//         _delta_n = 0;
+//         _term1   = 0;
+//     }
+
+//     inline T
+//     result()
+//     {
+//         return std::pow(_n, 0.5) * _M3.result() /
+//         std::pow(_M2.result(), 1.5);
+//     }
+
+//     void
+//     operator()(T value)
+//     {
+//         _n1 = _n;
+//         _n += 1;
+//         _delta   = value - _mean.result();
+//         _delta_n = _delta / _n;
+//         _term1   = _delta * _delta_n * _n1;
+//         _mean(_delta_n);
+//         _M3(_term1 * _delta_n * (_n - 2) - 3 * _delta_n * _M2.result());
+//         _M2(_term1);
+//     }
+
+//     template < typename InputIter, typename Getter >
+//     T
+//     operator()(InputIter&& begin, InputIter&& end, Getter&& getter)
+//     {
+//         std::for_each(std::forward< InputIter >(begin),
+//                       std::forward< InputIter >(end),
+//                       [&](auto&& value) { operator()(getter(value)); });
+//         return result();
+//     }
+
+//     template < typename InputIter >
+//     T
+//     operator()(InputIter&& begin, InputIter&& end)
+//     {
+//         return operator()(std::forward< InputIter >(begin),
+//                           std::forward< InputIter >(end),
+//                           [](auto&& v) { return v; });
+//     }
+
+//     Skewness() :
+//         _n(0), _mean(Sum< T >()), _M2(Sum< T >()), _M3(Sum< T >()), _n1(0),
+//         _delta(0), _delta_n(0), _term1(0)
+//     {
+//     }
+//     Skewness(const Skewness& other) = default;
+//     Skewness(Skewness&& other)      = default;
+//     Skewness&
+//     operator=(Skewness&& other) = default;
+//     Skewness&
+//     operator=(const Skewness& other) = default;
+//     virtual ~Skewness()              = default;
+// };
+
+// template < typename T, template < typename... > class Sum >
+// class Kurtosis
+// {
+//   protected:
+//     T        _n;
+//     Sum< T > _mean;
+//     Sum< T > _M2;
+//     Sum< T > _M3;
+//     Sum< T > _M4;
+//     T        _n1;
+//     T        _delta;
+//     T        _delta_n;
+//     T        _delta_n2;
+//     T        _term1;
+
+//   public:
+//     /**
+//      * [result description]
+//      * @method result
+//      * @return [description]
+//      */
+//     inline T
+//     result()
+//     {
+//         return _n * _M4.result() / (std::pow(_M2.result(), 2)) - 3.;
+//     }
+
+//     inline void
+//     reset()
+//     {
+//         _n        = 0;
+//         _mean     = Sum< T >();
+//         _M2       = Sum< T >();
+//         _M3       = Sum< T >();
+//         _M4       = Sum< T >();
+//         _n1       = 0;
+//         _delta    = 0;
+//         _delta_n  = 0;
+//         _delta_n2 = 0;
+//         _term1    = 0;
+//     }
+
+//     /**
+//      * [operator description]
+//      * @method operator
+//      */
+//     void
+//     operator()(T value)
+//     {
+//         _n1 = _n;
+//         _n += 1;
+//         _delta    = value - _mean.result();
+//         _delta_n  = _delta / _n;
+//         _delta_n2 = _delta_n * _delta_n;
+//         _term1    = _delta * _delta_n * _n1;
+//         _mean(_delta_n);
+//         _M4(_term1 * _delta_n2 * (_n * _n - 3 * _n + 3) +
+//             6 * _delta_n2 * _M2.result() - 4 * _delta_n * _M3.result());
+//         _M3(_term1 * _delta_n * (_n - 2) - 3 * _delta_n * _M2.result());
+//         _M2(_term1);
+//     }
+
+//     /**
+//      * [operator description]
+//      * @method operator
+//      * @return [description]
+//      */
+//     template < typename InputIter, typename Getter >
+//     T
+//     operator()(InputIter&& begin, InputIter&& end, Getter&& getter)
+//     {
+//         std::for_each(std::forward< InputIter >(begin),
+//                       std::forward< InputIter >(end),
+//                       [&](auto&& value) { operator()(getter(value)); });
+//         return result();
+//     }
+
+//     template < typename InputIter >
+//     T
+//     operator()(InputIter&& begin, InputIter&& end)
+//     {
+//         return operator()(std::forward< InputIter >(begin),
+//                           std::forward< InputIter >(end),
+//                           [](auto v) { return v; });
+//     }
+
+//     /**
+//      * [Kurtosis description]
+//      * @method Kurtosis
+//      */
+//     Kurtosis() :
+//         _n(0), _mean(Sum< T >()), _M2(Sum< T >()), _M3(Sum< T >()),
+//         _M4(Sum< T >()), _n1(0), _delta(0), _delta_n(0), _delta_n2(0),
+//         _term1(0)
+//     {
+//     }
+
+//     /**
+//      * Kurstosis Copy constructor
+//      * @method Kurtosis
+//      * @param  other    Object to copy from.
+//      */
+//     Kurtosis(const Kurtosis& other) = default;
+
+//     /**
+//      * Move Constructor
+//      * @method Kurtosis
+//      * @param  other    Object to move from
+//      */
+//     Kurtosis(Kurtosis&& other) = default;
+
+//     /**
+//      * [Kurtosis description]
+//      * @method Kurtosis
+//      */
+//     Kurtosis&
+//     operator=(Kurtosis&& other) = default;
+
+//     /**
+//      * [Kurtosis description]
+//      * @method Kurtosis
+//      */
+//     Kurtosis&
+//     operator=(const Kurtosis& other) = default;
+
+//     /**
+//      * Kurtosis destructor
+//      */
+//     virtual ~Kurtosis() = default;
+// };
+
+// /**
+//  * @brief Functor for computing Mode (most common value) of a stream of
+//  *        values. Be careful with large streams, because the records are
+//  *        stored in here.
+//  *
+//  */
+// template < typename T >
+// class Mode
+// {
+//   protected:
+//     std::unordered_map< T, std::size_t > _counter;
+//     T                                    _mode;
+
+//   public:
+//     inline void
+//     reset()
+//     {
+//         _counter.clear();
+//         _mode = 0;
+//     }
+
+//     inline T
+//     result()
+//     {
+//         return *std::max_element(_counter.begin(),
+//                                  _counter.end(),
+//                                  [](auto&& value) { return value.second; });
+//     }
+
+//     void
+//     operator()(T value)
+//     {
+//         ++_counter[value];
+//     }
+
+//     template < typename Iter, typename Getter >
+//     T
+//     operator()(Iter&& begin, Iter&& end, Getter&& getter)
+//     {
+//         std::for_each(std::forward< Iter >(begin),
+//                       std::forward< Iter >(end),
+//                       [&getter](auto&& value) { return getter(value); });
+//         return result();
+//     }
+
+//     template < typename Iter >
+//     T
+//     operator()(Iter&& begin, Iter&& end)
+//     {
+//         return operator()(std::forward< Iter >(begin),
+//                           std::forward< Iter >(end),
+//                           [](auto&& value) { return value; });
+//     }
+
+//     Mode() : _counter(std::unordered_map< T, std::size_t >()), _mode(0)
+//     {
+//     }
+//     Mode(const Mode& other) = default;
+//     Mode(Mode&& other)      = default;
+//     Mode&
+//     operator=(const Mode& other) = default;
+//     Mode&
+//     operator=(Mode&& other) = default;
+//     virtual ~Mode()         = default;
+// };
+
+// /**
+//  * @brief Functor for computing the 'percent'-th quantile of a data stream.
+//  *        Be careful with large data, because the record is stored in the
+//  class.
+//  *        Partially sorts the array, hence best used if multiple quantiles of
+//  *        the same data are needed.
+//  *
+//  * @tparam T Datatype to use
+//  * @tparam percent percentage giving the quantile to compute, e.g. 30 -> 30%
+//  * quantile
+//  * @tparam reservesize the number of elements the internal buffer shall
+//  allocate
+//  * memory for. defaults to 10000.
+//  */
+// template < typename T, std::size_t percent, std::size_t reservesize = 10000 >
+// class Quantile
+// {
+//   protected:
+//     std::vector< T > _data;
+
+//   public:
+//     inline T
+//     result()
+//     {
+//         // FIXME: Interpolation method needed here!
+//         return *std::nth_element(
+//             _data.begin(),
+//             _data.begin() + std::floor(_data.size() *
+//                                        (static_cast< double >(percent) /
+//                                        100)),
+//             _data.end());
+//     }
+
+//     inline void
+//     reset()
+//     {
+//         _data.clear();
+//     }
+
+//     T
+//     operator()(T value)
+//     {
+//         _data.push_back(value);
+//     }
+
+//     template < typename Iter, typename Getter >
+//     T
+//     operator()(Iter&& begin, Iter&& end, Getter&& getter)
+//     {
+//         std::for_each(
+//             std::forward< Iter >(begin),
+//             std::forward< Iter >(end),
+//             [&getter, this](auto&& v) { _data.push_back(getter(v)); });
+//         return result();
+//     }
+
+//     template < typename Iter >
+//     T
+//     operator()(Iter&& begin, Iter&& end)
+//     {
+//         _data.insert(_data.end(),
+//                      std::forward< Iter >(begin),
+//                      std::forward< Iter >(end));
+//         return result();
+//     }
+
+//     Quantile() : _data(std::vector< T >())
+//     {
+//         _data.reserve(reservesize);
+//     }
+//     Quantile(const Quantile& other) = default;
+//     Quantile(Quantile&& other)      = default;
+//     Quantile&
+//     operator=(const Quantile& other) = default;
+//     Quantile&
+//     operator=(Quantile&& other) = default;
+//     virtual ~Quantile()         = default;
+// };
+
+// template < typename T, std::size_t... quantiles >
+// class OnlineQuantile
+// {
+//   protected:
+//     std::array< std::size_t, sizeof...(quantiles) > _quantiles;
+
+//   public:
+//     OnlineQuantile()                            = default;
+//     OnlineQuantile(const OnlineQuantile& other) = default;
+//     OnlineQuantile(OnlineQuantile&& other)      = default;
+//     OnlineQuantile&
+//     operator=(const OnlineQuantile& other) = default;
+//     OnlineQuantile&
+//     operator=(OnlineQuantile&& other) = default;
+//     virtual ~OnlineQuantile()         = default;
+// };
+
+} // namespace Statistics
 
 #endif

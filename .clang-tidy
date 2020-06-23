@@ -5,7 +5,7 @@ HeaderFilterRegex: ''
 AnalyzeTemporaryDtorsclea: false
 FormatStyle:     none
 User:            haraldmack
-extra_arg: '-isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk'
+extra_arg: '-std=c++20 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk'
 CheckOptions:
   - key:             cert-dcl16-c.NewSuffixes
     value:           'L;LL;LU;LLU'

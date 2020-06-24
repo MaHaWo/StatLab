@@ -6,10 +6,10 @@
 
 # unignore stuff we want to keep
 !.gitignore
-!*/**/CMakeLists.txt
 !*/**/*.cc
 !*/**/*.hh
 !*/**/*.hpp
 !*/**/*.cpp
 !*/**/*.py
 !*/**/*.csv
+!*/**/*.txt

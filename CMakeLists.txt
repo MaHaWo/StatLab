@@ -11,8 +11,8 @@ project(StatLab VERSION 0.1 DESCRIPTION "Online, stable  algorithms for simple s
 add_library(StatLab INTERFACE)
 target_include_directories(StatLab INTERFACE include/)
 
-# set c++17 standard
-set (CMAKE_CXX_STANDARD 17)
+# set c++20 standard
+set (CMAKE_CXX_STANDARD 20)
 
 # enable testing and shit
 ENABLE_TESTING()

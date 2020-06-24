@@ -10,12 +10,14 @@
 #define UTOPIA_MODELS_AMEEMULTI_STATISTICS_HH
 
 #include "utils.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <numeric>
 #include <type_traits>
 #include <unistd.h>
 #include <unordered_map>
+#include <boost/hana.hpp>
 
 using namespace Statistics::Utils;
 
@@ -41,13 +43,17 @@ enum class NaNPolicy
  * @tparam T
  * @tparam NaNPolicy::propagate
  */
-template < typename T, NaNPolicy nan_p = NaNPolicy::propagate >
+template < typename T,
+           NaNPolicy nan_p                           = NaNPolicy::propagate,
+           template < typename... > class BinaryFunc = std::plus >
 class SumPairwise final
 {
   private:
-    T _s;
+    T               _s;
+    BinaryFunc< T > _plus;
 
   public:
+    using result_type = T;
     /**
      * @brief Construct a new Sum object
      *
@@ -127,9 +133,8 @@ class SumPairwise final
      * @param value
      * @return constexpr T
      */
-    template < typename U >
     inline constexpr T
-    operator()(U&& value)
+    operator()(const T& value)
     {
         static_assert(std::is_convertible< U, T >::value,
                       "Error, type T in struct 'sum' not comptabile with type "
@@ -137,20 +142,20 @@ class SumPairwise final
 
         if constexpr (nan_p == NaNPolicy::propagate)
         {
-            _s += value;
+            _s = _plus(_s, value);
         }
         else if constexpr (nan_p == NaNPolicy::skip)
         {
             if (not std::isnan(value) and not std::isinf(value))
             {
-                _s += value;
+                _s = _plus(_s, value);
             }
         }
         else
         {
             if (not std::isnan(value) and not std::isinf(value))
             {
-                _s += value;
+                _s = _plus(_s, value);
             }
             else
             {
@@ -227,7 +232,9 @@ class SumPairwise final
  * @tparam T
  * @tparam NaNPolicy::propagate
  */
-template < typename T, NaNPolicy nan_p = NaNPolicy::propagate >
+template < typename T,
+           NaNPolicy nan_p                           = NaNPolicy::propagate,
+           template < typename... > class BinaryFunc = std::plus >
 class SumKahan final
 {
   private:
@@ -236,7 +243,11 @@ class SumKahan final
     T _s;
     T _comp;
 
+    BinaryFunc< T > _plus;
+
   public:
+    using result_type = T;
+
     /**
      * @brief Construct a new Sum Kahan object
      *
@@ -377,16 +388,16 @@ class SumKahan final
 
         if constexpr (nan_p == NaNPolicy::propagate)
         {
-            _y = value - _comp;
-            _t = _s + _y;
+            _y = _plus(value, T(-1.) * _comp);
+            _t = _plus(_s, _y);
             _s = _t;
         }
         else if constexpr (nan_p == NaNPolicy::skip)
         {
             if (not std::isnan(value) and not std::isinf(value))
             {
-                _y = value - _comp;
-                _t = _s + _y;
+                _y = _plus(value, T(-1.) * _comp);
+                _t = _plus(_s, _y);
                 _s = _t;
             }
         }
@@ -394,8 +405,8 @@ class SumKahan final
         {
             if (not std::isnan(value) and not std::isinf(value))
             {
-                _y = value - _comp;
-                _t = _s + _y;
+                _y = _plus(value, T(-1.) * _comp);
+                _t = _plus(_s, _y);
                 _s = _t;
             }
             else
@@ -416,13 +427,16 @@ class SumKahan final
  * @tparam T
  * @tparam NaNPolicy::propagate
  */
-template < typename T, NaNPolicy nan_p = NaNPolicy::propagate >
+template < typename T,
+           NaNPolicy nan_p                           = NaNPolicy::propagate,
+           template < typename... > class BinaryFunc = std::plus >
 class Product final
 {
   private:
     T _result;
 
   public:
+    using result_type = T;
 };
 
 /**
@@ -435,15 +449,18 @@ class Product final
  */
 template < typename T,
            std::size_t order,
-           template < typename... > class SumAlgo = SumPairwise,
-           NaNPolicy nan_p                        = NaNPolicy::propagate >
+           template < typename... > class SumAlgo    = SumPairwise,
+           NaNPolicy nan_p                           = NaNPolicy::propagate,
+           template < typename... > class BinaryFunc = std::plus >
 class Moment final
 {
   private:
-    SumAlgo< T, nan_p > _sum;
-    T                   _n;
+    SumAlgo< T, nan_p, BinaryFunc > _sum;
+    T                               _n;
 
   public:
+    using result_type = T;
+
     Moment() noexcept : _sum(), _n(T{})
     {
     }
@@ -456,10 +473,12 @@ class Moment final
     ~Moment()           = default;
 
     inline auto
-    operator()(T v) -> T
+    operator()(const T& v) -> T
     {
         ++_n;
-        _sum(v)
+        _sum(std::pow(v, order));
+
+        return _sum.result() / _n;
     }
 
     template < typename Iter, typename Getter >
@@ -469,10 +488,312 @@ class Moment final
         for (; begin != end; ++begin)
         {
             ++_n;
-            _sum(getter(*begin));
+            _sum(std::pow(getter(*begin), order));
         }
 
-        return std::pow(_sum.result(), order) / _n;
+        return _sum.result() / _n;
+    }
+
+    template < typename Iter >
+    inline auto
+    operator()(Iter&& begin, Iter&& end) -> T
+    {
+        return operator()(std::forward< Iter >(begin),
+                          std::forward< Iter >(end),
+                          [](auto&& v) { return v; });
+    }
+};
+
+/**
+ * @brief TODO
+ *
+ * @tparam T
+ * @tparam order
+ * @tparam SumPairwise
+ * @tparam NaNPolicy::propagate
+ */
+template < typename T,
+           std::size_t order,
+           template < typename... > class SumAlgo    = SumPairwise,
+           NaNPolicy nan_p                           = NaNPolicy::propagate,
+           template < typename... > class BinaryFunc = std::plus >
+class CentralMoment final
+{
+  private:
+    // todo
+
+  public:
+    using result_type = T;
+
+    inline auto
+    operator()(const T& v) -> T
+    {
+        static_assert(false, "Not implemented yet");
+    }
+
+    template < typename Iter, typename Getter >
+    inline auto
+    operator()(Iter&& begin, Iter&& end, Getter&& getter) -> T
+    {
+        static_assert(false, "Not implemented yet");
+    }
+
+    template < typename Iter >
+    inline auto
+    operator()(Iter&& begin, Iter&& end) -> T
+    {
+        return operator()(std::forward< Iter >(begin),
+                          std::forward< Iter >(end),
+                          [](auto&& v) { return v; });
+    }
+};
+
+template < typename T,
+           template < typename... > class SumAlgo    = SumPairwise,
+           NaNPolicy nan_p                           = NaNPolicy::propagate,
+           template < typename... > class BinaryFunc = std::plus >
+using ArithmeticMean = Moment< T, 1, SumAlgo, nan_p, BinaryFunc >;
+
+template < typename T,
+           template < typename... > class SumAlgo    = SumPairwise,
+           NaNPolicy nan_p                           = NaNPolicy::propagate,
+           template < typename... > class BinaryFunc = std::plus >
+class HarmonicMean final
+{
+  public:
+    inline auto
+    operator()(const T& v) -> T
+    {
+        static_assert(false, "Not implemented yet");
+    }
+
+    template < typename Iter, typename Getter >
+    inline auto
+    operator()(Iter&& begin, Iter&& end, Getter&& getter) -> T
+    {
+        static_assert(false, "Not implemented yet");
+    }
+
+    template < typename Iter >
+    inline auto
+    operator()(Iter&& begin, Iter&& end) -> T
+    {
+        return operator()(std::forward< Iter >(begin),
+                          std::forward< Iter >(end),
+                          [](auto&& v) { return v; });
+    }
+};
+
+template < typename T,
+           template < typename... > class SumAlgo    = SumPairwise,
+           NaNPolicy nan_p                           = NaNPolicy::propagate,
+           template < typename... > class BinaryFunc = std::plus >
+class GeometricMean final
+
+{
+  public:
+    using result_type = T;
+
+    inline auto
+    operator()(const T& v) -> T
+    {
+        static_assert(false, "Not implemented yet");
+    }
+
+    template < typename Iter, typename Getter >
+    inline auto
+    operator()(Iter&& begin, Iter&& end, Getter&& getter) -> T
+    {
+        static_assert(false, "Not implemented yet");
+    }
+
+    template < typename Iter >
+    inline auto
+    operator()(Iter&& begin, Iter&& end) -> T
+    {
+        return operator()(std::forward< Iter >(begin),
+                          std::forward< Iter >(end),
+                          [](auto&& v) { return v; });
+    }
+};
+
+template < typename T,
+           template < typename... > class SumAlgo    = SumPairwise,
+           NaNPolicy nan_p                           = NaNPolicy::propagate,
+           template < typename... > class BinaryFunc = std::plus >
+class Variance final
+
+{
+  public:
+    using result_type = T;
+
+    inline auto
+    operator()(const T& v) -> T
+    {
+        static_assert(false, "Not implemented yet");
+    }
+
+    template < typename Iter, typename Getter >
+    inline auto
+    operator()(Iter&& begin, Iter&& end, Getter&& getter) -> T
+    {
+        static_assert(false, "Not implemented yet");
+    }
+
+    template < typename Iter >
+    inline auto
+    operator()(Iter&& begin, Iter&& end) -> T
+    {
+        return operator()(std::forward< Iter >(begin),
+                          std::forward< Iter >(end),
+                          [](auto&& v) { return v; });
+    }
+};
+
+template < typename T,
+           template < typename... > class SumAlgo    = SumPairwise,
+           NaNPolicy nan_p                           = NaNPolicy::propagate,
+           template < typename... > class BinaryFunc = std::plus >
+class Std final
+
+{
+    Variance< T, SumAlgo, nan_p > _var;
+
+  public:
+    using result_type = T;
+
+    inline auto
+    operator()(const T& v) -> T
+    {
+        _var(v);
+        return std::sqrt(_var.result());
+    }
+
+    template < typename Iter, typename Getter >
+    inline auto
+    operator()(Iter&& begin, Iter&& end, Getter&& getter) -> T
+    {
+        _var(std::forward< Iter >(begin),
+             std::forward< Iter >(end),
+             std::forward< Getter >(getter));
+        return std::sqrt(_var.result());
+    }
+
+    template < typename Iter >
+    inline auto
+    operator()(Iter&& begin, Iter&& end) -> T
+    {
+        return operator()(std::forward< Iter >(begin),
+                          std::forward< Iter >(end),
+                          [](auto&& v) { return v; });
+    }
+};
+
+/**
+ * @brief TODO
+ * 
+ * @tparam T 
+ * @tparam SumPairwise 
+ * @tparam NaNPolicy::propagate 
+ * @tparam std::plus 
+ */
+template < typename T,
+           template < typename... > class SumAlgo    = SumPairwise,
+           NaNPolicy nan_p                           = NaNPolicy::propagate,
+           template < typename... > class BinaryFunc = std::plus >
+class Skewness final
+
+{
+  public:
+    using result_type = T;
+
+    inline constexpr auto reset() -> void 
+    {
+
+    }
+
+    inline constexpr auto result() -> T 
+    {
+
+    }
+
+
+    /**
+     * @brief TODO
+     * 
+     * @param v 
+     * @return T 
+     */
+    inline auto
+    operator()(const T& v) -> T
+    {
+        static_assert(false, "Not implemented yet");
+    }
+
+    /**
+     * @brief TODO
+     * 
+     * @tparam Iter 
+     * @tparam Getter 
+     * @param begin 
+     * @param end 
+     * @param getter 
+     * @return T 
+     */
+    template < typename Iter, typename Getter >
+    inline auto
+    operator()(Iter&& begin, Iter&& end, Getter&& getter) -> T
+    {
+        static_assert(false, "Not implemented yet");
+    }
+
+    /**
+     * @brief TODO
+     * 
+     * @tparam Iter 
+     * @param begin 
+     * @param end 
+     * @return T 
+     */
+    template < typename Iter >
+    inline auto
+    operator()(Iter&& begin, Iter&& end) -> T
+    {
+        operator()(std::forward< Iter >(begin),
+                   std::forward< Iter >(end),
+                   [](auto&& v) { return v; });
+    }
+};
+
+/**
+ * @brief TODO
+ *
+ * @tparam T
+ * @tparam SumPairwise
+ * @tparam
+ * @tparam std::plus
+ */
+template < typename T,
+           template < typename... > class SumAlgo    = SumPairwise,
+           NaNPolicy nan_p                           = NaNPolicy::propagate,
+           template < typename... > class BinaryFunc = std::plus >
+class Kurtosis final
+
+{
+  public:
+    using result_type = T;
+
+    inline auto
+    operator()(const T& v) -> T
+    {
+        static_assert(false, "Not implemented yet");
+    }
+
+    template < typename Iter, typename Getter >
+    inline auto
+    operator()(Iter&& begin, Iter&& end, Getter&& getter) -> T
+    {
+        static_assert(false, "Not implemented yet");
     }
 
     template < typename Iter >
@@ -489,266 +810,199 @@ class Moment final
  * @brief TODO
  *
  * @tparam T
- * @tparam order
  * @tparam SumPairwise
  * @tparam NaNPolicy::propagate
+ * @tparam std::plus
  */
 template < typename T,
-           std::size_t order,
-           template < typename... > class SumAlgo = SumPairwise,
-           NaNPolicy nan_p                        = NaNPolicy::propagate >
-class CentralMoment final
-{
-  private:
-    Moment< T, order, SumAlgo, nan_p > _moment;
-
-  public:
-    inline auto
-    operator()(T v) -> T
-    {
-        static_assert(false, "Not implemented yet");
-    }
-
-    template < typename Iter, typename Getter >
-    inline auto
-    operator()(Iter&& begin, Iter&& end, Getter&& getter) -> T
-    {
-        static_assert(false, "Not implemented yet");
-    }
-
-    template < typename Iter >
-    inline auto
-    operator()(Iter&& begin, Iter&& end) -> T
-    {
-        operator()(std::forward< Iter >(begin),
-                   std::forward< Iter >(end),
-                   [](auto&& v) { return v; });
-    }
-};
-
-template < typename T,
-           template < typename... > class SumAlgo = SumPairwise,
-           NaNPolicy nan_p                        = NaNPolicy::propagate >
-class ArithmeticMean final
-
-{
-  public:
-    inline auto
-    operator()(T v) -> T
-    {
-        static_assert(false, "Not implemented yet");
-    }
-
-    template < typename Iter, typename Getter >
-    inline auto
-    operator()(Iter&& begin, Iter&& end, Getter&& getter) -> T
-    {
-        static_assert(false, "Not implemented yet");
-    }
-
-    template < typename Iter >
-    inline auto
-    operator()(Iter&& begin, Iter&& end) -> T
-    {
-        operator()(std::forward< Iter >(begin),
-                   std::forward< Iter >(end),
-                   [](auto&& v) { return v; });
-    }
-};
-
-template < typename T,
-           template < typename... > class SumAlgo = SumPairwise,
-           NaNPolicy nan_p                        = NaNPolicy::propagate >
-class HarmonicMean final
-
-{
-  public:
-    inline auto
-    operator()(T v) -> T
-    {
-        static_assert(false, "Not implemented yet");
-    }
-
-    template < typename Iter, typename Getter >
-    inline auto
-    operator()(Iter&& begin, Iter&& end, Getter&& getter) -> T
-    {
-        static_assert(false, "Not implemented yet");
-    }
-
-    template < typename Iter >
-    inline auto
-    operator()(Iter&& begin, Iter&& end) -> T
-    {
-        operator()(std::forward< Iter >(begin),
-                   std::forward< Iter >(end),
-                   [](auto&& v) { return v; });
-    }
-};
-
-template < typename T,
-           template < typename... > class SumAlgo = SumPairwise,
-           NaNPolicy nan_p                        = NaNPolicy::propagate >
-class GeometricMean final
-
-{
-  public:
-    inline auto
-    operator()(T v) -> T
-    {
-        static_assert(false, "Not implemented yet");
-    }
-
-    template < typename Iter, typename Getter >
-    inline auto
-    operator()(Iter&& begin, Iter&& end, Getter&& getter) -> T
-    {
-        static_assert(false, "Not implemented yet");
-    }
-
-    template < typename Iter >
-    inline auto
-    operator()(Iter&& begin, Iter&& end) -> T
-    {
-        operator()(std::forward< Iter >(begin),
-                   std::forward< Iter >(end),
-                   [](auto&& v) { return v; });
-    }
-};
-
-template < typename T,
-           template < typename... > class SumAlgo = SumPairwise,
-           NaNPolicy nan_p                        = NaNPolicy::propagate >
-class Variance final
-
-{
-  public:
-    inline auto
-    operator()(T v) -> T
-    {
-        static_assert(false, "Not implemented yet");
-    }
-
-    template < typename Iter, typename Getter >
-    inline auto
-    operator()(Iter&& begin, Iter&& end, Getter&& getter) -> T
-    {
-        static_assert(false, "Not implemented yet");
-    }
-
-    template < typename Iter >
-    inline auto
-    operator()(Iter&& begin, Iter&& end) -> T
-    {
-        operator()(std::forward< Iter >(begin),
-                   std::forward< Iter >(end),
-                   [](auto&& v) { return v; });
-    }
-};
-
-template < typename T,
-           template < typename... > class SumAlgo = SumPairwise,
-           NaNPolicy nan_p                        = NaNPolicy::propagate >
-class Std final
-
-{
-  public:
-    inline auto
-    operator()(T v) -> T
-    {
-        static_assert(false, "Not implemented yet");
-    }
-
-    template < typename Iter, typename Getter >
-    inline auto
-    operator()(Iter&& begin, Iter&& end, Getter&& getter) -> T
-    {
-        static_assert(false, "Not implemented yet");
-    }
-
-    template < typename Iter >
-    inline auto
-    operator()(Iter&& begin, Iter&& end) -> T
-    {
-        operator()(std::forward< Iter >(begin),
-                   std::forward< Iter >(end),
-                   [](auto&& v) { return v; });
-    }
-};
-
-template < typename T,
-           template < typename... > class SumAlgo = SumPairwise,
-           NaNPolicy nan_p                        = NaNPolicy::propagate >
-class Skewness final
-
-{
-  public:
-    inline auto
-    operator()(T v) -> T
-    {
-        static_assert(false, "Not implemented yet");
-    }
-
-    template < typename Iter, typename Getter >
-    inline auto
-    operator()(Iter&& begin, Iter&& end, Getter&& getter) -> T
-    {
-        static_assert(false, "Not implemented yet");
-    }
-
-    template < typename Iter >
-    inline auto
-    operator()(Iter&& begin, Iter&& end) -> T
-    {
-        operator()(std::forward< Iter >(begin),
-                   std::forward< Iter >(end),
-                   [](auto&& v) { return v; });
-    }
-};
-
-template < typename T,
-           template < typename... > class SumAlgo = SumPairwise,
-           NaNPolicy nan_p                        = NaNPolicy::propagate >
-class Kurtosis final
-
-{
-  public:
-    inline auto
-    operator()(T v) -> T
-    {
-        static_assert(false, "Not implemented yet");
-    }
-
-    template < typename Iter, typename Getter >
-    inline auto
-    operator()(Iter&& begin, Iter&& end, Getter&& getter) -> T
-    {
-        static_assert(false, "Not implemented yet");
-    }
-
-    template < typename Iter >
-    inline auto
-    operator()(Iter&& begin, Iter&& end) -> T
-    {
-        operator()(std::forward< Iter >(begin),
-                   std::forward< Iter >(end),
-                   [](auto&& v) { return v; });
-    }
-};
-
-template < typename T,
-           template < typename... > class SumAlgo = SumPairwise,
-           NaNPolicy nan_p                        = NaNPolicy::propagate >
+           template < typename... > class SumAlgo    = SumPairwise,
+           NaNPolicy nan_p                           = NaNPolicy::propagate,
+           template < typename... > class BinaryFunc = std::plus >
 class ExcessKurtosis final
 
 {
-  public:
+    
+    Kurtosis< T, SumAlgo, nan_p, BinaryFunc > _kurtosis public
+        : using result_type = T;
+
+public:
+
+    inline auto reset() -> void 
+    {   
+        _kurtosis.reset();
+    }
+
+
+    inline auto result() -> T 
+    {
+        return _kurtosis.result();
+    }
+
     inline auto
-    operator()(T v) -> T
+    operator()(const T& v) -> T
+    {
+        _kurtosis(v);
+        return _kurtosis.result() - 3.;
+    }
+
+    template < typename Iter, typename Getter >
+    inline auto
+    operator()(Iter&& begin, Iter&& end, Getter&& getter) -> T
+    {
+        _kurtosis(std::forward< Iter >(begin),
+                  std::forward< Iter >(end),
+                  std::forward< Getter >(getter));
+        return _kurtosis.result() - 3.;
+    }
+
+    template < typename Iter >
+    inline auto
+    operator()(Iter&& begin, Iter&& end) -> T
+    {
+        return operator()(std::forward< Iter >(begin),
+                          std::forward< Iter >(end),
+                          [](auto&& v) { return v; });
+    }
+};
+
+/**
+ * @brief TODO
+ * 
+ * @tparam T 
+ * @tparam NaNPolicy::propagate 
+ * @tparam std::hash 
+ * @tparam std::equal_to 
+ */
+template < typename T,
+           NaNPolicy nan_p                        = NaNPolicy::propagate,
+           template < typename... > class Hasher  = std::hash,
+           template < typename... > class Compare = std::equal_to >
+class Mode final
+{
+    std::unordered_map< T, std::size_t, Hasher< T >, Compare< T > > _counts;
+
+  public:
+    using result_type = T;
+
+
+    /**
+     * @brief TODO
+     * 
+     */
+    inline auto
+    reset() -> void
+    {
+        _counts.clear();
+    }
+
+    /**
+     * @brief TODO
+     * 
+     * @return T 
+     */
+    inline auto
+    result() -> T
+    {
+        return std::max_element(_counts.begin(),
+                                _counts.end(),
+                                [](auto&& lhs, auto&& rhs) {
+                                    return lhs.second < rhs.second;
+                                })
+            ->second;
+    }
+
+    /**
+     * @brief TODO
+     * 
+     * @param v 
+     * @return T 
+     */
+    inline auto
+    operator()(const T& v) -> T
+    {
+        ++_counts[T];
+
+        return result();
+    }
+
+    /**
+     * @brief TODO
+     * 
+     * @tparam Iter 
+     * @tparam Getter 
+     * @param begin 
+     * @param end 
+     * @param getter 
+     * @return T 
+     */
+    template < typename Iter, typename Getter >
+    inline auto
+    operator()(Iter&& begin, Iter&& end, Getter&& getter) -> T
+    {
+        for(; begin != end; ++begin)
+        {
+           ++_counts[getter(*begin)];
+        }
+
+        return result();
+    }
+
+    /**
+     * @brief TODO
+     * 
+     * @tparam Iter 
+     * @param begin 
+     * @param end 
+     * @return T 
+     */
+    template < typename Iter >
+    inline auto
+    operator()(Iter&& begin, Iter&& end) -> T
+    {
+        return operator()(std::forward< Iter >(begin),
+                   std::forward< Iter >(end),
+                   [](auto&& v) { return v; });
+    }
+};
+
+/**
+ * @brief TODO
+ * 
+ * @tparam T 
+ * @tparam percent 
+ * @tparam NaNPolicy::propagate 
+ */
+template < typename T,
+           std::size_t percent,
+           NaNPolicy   nan_p = NaNPolicy::propagate >
+class Quantile final
+
+{
+  public:
+    using result_type = T;
+
+    /**
+     * @brief TODO
+     * 
+     * @param v 
+     * @return T 
+     */
+    inline auto
+    operator()(const T& v) -> T
     {
         static_assert(false, "Not implemented yet");
     }
 
+    /**
+     * @brief TODO
+     * 
+     * @tparam Iter 
+     * @tparam Getter 
+     * @param begin 
+     * @param end 
+     * @param getter 
+     * @return T 
+     */
     template < typename Iter, typename Getter >
     inline auto
     operator()(Iter&& begin, Iter&& end, Getter&& getter) -> T
@@ -756,9 +1010,74 @@ class ExcessKurtosis final
         static_assert(false, "Not implemented yet");
     }
 
+    /**
+     * @brief TODO
+     * 
+     * @tparam Iter 
+     * @param begin 
+     * @param end 
+     * @return T 
+     */
     template < typename Iter >
     inline auto
     operator()(Iter&& begin, Iter&& end) -> T
+    {
+        operator()(std::forward< Iter >(begin),
+                   std::forward< Iter >(end),
+                   [](auto&& v) { return v; });
+    }
+};
+
+/**
+ * @brief TODO
+ * 
+ * @tparam T 
+ * @tparam percent 
+ * @tparam NaNPolicy::propagate 
+ */
+template < typename T,
+           std::size_t percent,
+           NaNPolicy   nan_p = NaNPolicy::propagate >
+using Median = Quantile< T, 50, nan_p >;
+
+template < typename T,
+           NaNPolicy nan_p                           = NaNPolicy::propagate,
+           template < typename... > class BinaryFunc = std::plus >
+class Describe
+{
+  public:
+    struct Result
+    {
+        T count;
+        T mean;
+        T std;
+        T skewness;
+        T kurtosis;
+        T min;
+        T q25;
+        T median;
+        T q75;
+        T max;
+    };
+
+    using result_type = Result;
+
+    inline auto
+    operator()(const T& v)
+    {
+        static_assert(false, "Not implemented yet");
+    }
+
+    template < typename Iter, typename Getter >
+    inline auto
+    operator()(Iter&& begin, Iter&& end, Getter&& getter) -> result_type
+    {
+        static_assert(false, "Not implemented yet");
+    }
+
+    template < typename Iter >
+    inline auto
+    operator()(Iter&& begin, Iter&& end) -> result_type
     {
         operator()(std::forward< Iter >(begin),
                    std::forward< Iter >(end),
@@ -767,26 +1086,42 @@ class ExcessKurtosis final
 };
 
 template < typename T, NaNPolicy nan_p = NaNPolicy::propagate >
-class Mode final
-
+class TukeyFiveNumbers
 {
+
   public:
+    struct Result
+    {
+        T count;
+        T mean;
+        T std;
+        T skewness;
+        T kurtosis;
+        T min;
+        T q25;
+        T median;
+        T q75;
+        T max;
+    };
+
+    using result_type = Result;
+
     inline auto
-    operator()(T v) -> T
+    operator()(const T& v)
     {
         static_assert(false, "Not implemented yet");
     }
 
     template < typename Iter, typename Getter >
     inline auto
-    operator()(Iter&& begin, Iter&& end, Getter&& getter) -> T
+    operator()(Iter&& begin, Iter&& end, Getter&& getter) -> result_type
     {
         static_assert(false, "Not implemented yet");
     }
 
     template < typename Iter >
     inline auto
-    operator()(Iter&& begin, Iter&& end) -> T
+    operator()(Iter&& begin, Iter&& end) -> result_type
     {
         operator()(std::forward< Iter >(begin),
                    std::forward< Iter >(end),
@@ -794,40 +1129,45 @@ class Mode final
     }
 };
 
-template < typename T,
-           std::size_t percent,
-           NaNPolicy   nan_p = NaNPolicy::propagate >
-class Quantile final
-
+template < NaNPolicy nan_p,
+           ,
+           template < typename... >
+           class BinaryFunc,
+           typename... Operators >
+class describe
 {
+
+    boost::hana::tuple< Operators... > _operators;
+
+    boost::hana::tuple< typename Operators::result_type... > _results;
+
   public:
+    using result_type =
+        boost::hana::tuple< typename Operators::result_type... >;
+
+    template < typename T >
     inline auto
-    operator()(T v) -> T
+    opertator()(T&& v) -> T
     {
         static_assert(false, "Not implemented yet");
     }
 
     template < typename Iter, typename Getter >
     inline auto
-    operator()(Iter&& begin, Iter&& end, Getter&& getter) -> T
+    operator()(Iter&& begin, Iter&& end, Getter&& getter) -> result_type
     {
         static_assert(false, "Not implemented yet");
     }
 
     template < typename Iter >
     inline auto
-    operator()(Iter&& begin, Iter&& end) -> T
+    operator()(Iter&& begin, Iter&& end) -> result_type
     {
         operator()(std::forward< Iter >(begin),
                    std::forward< Iter >(end),
                    [](auto&& v) { return v; });
     }
 };
-
-template < typename T,
-           std::size_t percent,
-           NaNPolicy   nan_p = NaNPolicy::propagate >
-using Median = Quantile< T, 50, nan_p >;
 
 }
 

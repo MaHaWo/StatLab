@@ -12,4 +12,5 @@
 !*/**/*.cpp
 !*/**/*.py
 !*/**/*.csv
-!*/**/*.txt
+!*/**/CMakeLists.txt
+!*/**/BoostTestHelpers.cmake

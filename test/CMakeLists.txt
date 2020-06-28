@@ -1,6 +1,6 @@
 # include custom add_test function stolen from here: 
 # https://eb2.co/blog/2015/06/driving-boost.test-with-cmake/
-include(BoostTestHelpers)
+include(BoostTestHelpers.cmake)
 
 # find boost unit test framework
 find_package(Boost COMPONENTS unit_test_framework REQUIRED)

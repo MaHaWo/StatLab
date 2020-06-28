@@ -1,5 +1,6 @@
 
 #define BOOST_TEST_MODULE UNARY_TESTS
+
 #include <boost/test/included/unit_test.hpp>
 
 #include <exception>
@@ -69,9 +70,9 @@ BOOST_FIXTURE_TEST_CASE(sum_test, Fix)
     // uniform: -44701.74983180444
     // normal: -53313.558700174326
 
-    Sum< double, NaNPolicy::propagate > sum_propagate;
-    Sum< double, NaNPolicy::skip >      sum_skip;
-    Sum< double, NaNPolicy::error >     sum_throw;
+    SumPairwise< double, NaNPolicy::propagate > sum_propagate;
+    SumPairwise< double, NaNPolicy::skip >      sum_skip;
+    SumPairwise< double, NaNPolicy::error >     sum_throw;
 
     sum_propagate.reset();
     BOOST_TEST(sum_propagate.result() == 0);
@@ -80,14 +81,20 @@ BOOST_FIXTURE_TEST_CASE(sum_test, Fix)
     for (auto&& it = u.begin(); it != u.end(); ++it)
     {
         sum_propagate(*it);
+        sum_skip(*it);
     }
 
     BOOST_TEST(sum_propagate.result() == -44701.74983180444);
+    BOOST_TEST(sum_skip.result() == -44701.74983180444);
 
     // partition sum
     sum_propagate.reset();
+    sum_skip.reset();
+
     sum_propagate(u.begin(), u.end());
+    sum_skip(u.begin(), u.end());
     BOOST_TEST(sum_propagate.result() == -44701.74983180444);
+    BOOST_TEST(sum_skip.result() == -44701.74983180444);
 
     sum_propagate(u_inf_nan.begin(), u_inf_nan.end());
     BOOST_TEST(std::isnan(sum_propagate.result()));
@@ -122,25 +129,42 @@ BOOST_FIXTURE_TEST_CASE(sum_test, Fix)
 BOOST_TEST_DECORATOR(*boost::unit_test::tolerance(2e-15));
 BOOST_FIXTURE_TEST_CASE(sum_kahan_test, Fix)
 {
-    // numpy values for sum, obtained via partial summation algorithm
-    // uniform: -44701.74983180444
-    // normal: -53313.558700174326
+    // numpy values for sum, obtained via kahan summation algorithm
+    // stolen from rosetta code: 
+    // 
+    // def kahansum(input): 
+    //     summ = c = 0 
+    //     for num in input: 
+    //         y = num - c 
+    //         t = summ + y 
+    //         c = (t - summ) - y 
+    //         summ = t 
+    //     return summ 
+    // 
+    // uniform: -44701.749831804475
+    // normal: -53313.55870017432
 
     SumKahan< double, NaNPolicy::propagate > sum_propagate;
     SumKahan< double, NaNPolicy::skip >      sum_skip;
     SumKahan< double, NaNPolicy::error >     sum_throw;
 
     sum_propagate.reset();
-    BOOST_TEST(sum_propagate.result() == 0);
+    sum_skip.reset();
+    BOOST_TEST(sum_propagate.result() == 0.);
+    BOOST_TEST(sum_skip.result() == 0.);
 
     // value based operator
     for (auto&& it = u.begin(); it != u.end(); ++it)
     {
         sum_propagate(*it);
+        sum_skip(*it);
     }
 
-    BOOST_TEST(sum_propagate.result() == -44701.74983180444);
+    BOOST_TEST(sum_propagate.result() == -44701.749831804475);
+    BOOST_TEST(sum_skip.result() ==-44701.749831804475);
 
     sum_propagate.reset();
-    BOOST_TEST(sum_propagate.result() == 0);
+    sum_skip.reset();
+    BOOST_TEST(sum_propagate.result() == 0.);
+    BOOST_TEST(sum_skip.result() == 0.);
 }

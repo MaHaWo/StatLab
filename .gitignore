@@ -1,6 +1,9 @@
 # Ignore everything
 *
 
+# Ignore build dirs
+*/build/*
+
 # But allow descend into directories
 !*/
 
@@ -9,7 +12,7 @@
 !*/**/*.cc
 !*/**/*.hh
 !*/**/*.hpp
-!*/**/*.cpp
+!*/**/*.cppökk
 !*/**/*.py
 !*/**/*.csv
 !*/**/CMakeLists.txt

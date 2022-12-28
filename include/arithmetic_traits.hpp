@@ -1,12 +1,12 @@
-#ifndef StatLab_UTILITY_HPP
-#define StatLab_UTILITY_HPP
+#ifndef STATLAB_ARITHMETIC_TRAITS_HPP
+#define STATLAB_ARITHMETIC_TRAITS_HPP
 #include <cmath>
 #include <type_traits>
 #include <utility>
 #include <functional>
 
 namespace StatLab {
-namespace Utils {
+namespace Traits {
 
 /**
  * @brief Determine if a type T has a multiplicative inverse

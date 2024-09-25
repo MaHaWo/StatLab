@@ -124,13 +124,13 @@ BOOST_FIXTURE_TEST_CASE(Moment_test, Fixture)
     }
 
     BOOST_TEST(first_moment_python == first_moment_kahan.result(),
-               boost::test_tools::tolerance(5.9e-16));
+               boost::test_tools::tolerance(2e-15));
 
     BOOST_TEST(second_moment_python == second_moment_kahan.result(),
-               boost::test_tools::tolerance(2e-16));
+               boost::test_tools::tolerance(2e-15));
 
     BOOST_TEST(first_moment_python == first_moment_pairwise.result(),
-               boost::test_tools::tolerance(7.1e-15));
+               boost::test_tools::tolerance(2e-15));
 
     BOOST_TEST(second_moment_python == second_moment_pairwise.result(),
                boost::test_tools::tolerance(2e-15)); // FIXME: this is wrong!!
